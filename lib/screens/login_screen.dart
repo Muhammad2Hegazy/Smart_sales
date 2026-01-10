@@ -195,6 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               builder: (context) {
                                 return DropdownButtonFormField<UserProfile>(
                                   key: ValueKey('user_dropdown_${_users.length}'),
+                                  // ignore: deprecated_member_use
                                   value: _selectedUser,
                                   decoration: InputDecoration(
                                     labelText: l10n.selectUser,
@@ -500,6 +501,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   DropdownButtonFormField<UserProfile>(
+                    // ignore: deprecated_member_use
                     value: selectedUserForReset,
                     decoration: InputDecoration(
                       labelText: l10n.selectUser,
@@ -666,23 +668,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
 
                     if (!mounted) return;
-                    Navigator.pop(dialogContext);
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.passwordResetSuccessfully),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
+                      final scaffoldContext = context;
+                      if (scaffoldContext.mounted) {
+                        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.passwordResetSuccessfully),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      }
                     }
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.errorResettingPassword(e.toString())),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
+                    final scaffoldContext = context;
+                    if (scaffoldContext.mounted) {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.errorResettingPassword(e.toString())),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    }
                   }
                 },
               ),

@@ -189,6 +189,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   DropdownButtonFormField<SubCategory>(
+                    // ignore: deprecated_member_use
                     value: selectedSubCategory,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
@@ -246,6 +247,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   DropdownButtonFormField<String>(
+                    // ignore: deprecated_member_use
                     value: selectedUnit,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(

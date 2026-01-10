@@ -664,8 +664,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       text: (currentHospitalityTaxRate * 100).toStringAsFixed(2),
     );
 
+    if (!mounted) return;
+    final navigatorContext = context;
+    if (!navigatorContext.mounted) return;
     showDialog(
-      context: context,
+      context: navigatorContext,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(l10n.taxSettings),
@@ -885,8 +888,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool isPortrait = currentSettings.isPortrait;
     bool isLoadingPrinters = false;
     
+    if (!mounted) return;
+    final navigatorContext = context;
+    if (!navigatorContext.mounted) return;
     showDialog(
-      context: context,
+      context: navigatorContext,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(l10n.printerSettings),
@@ -898,6 +904,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Printer selection dropdown
                 if (printers.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
+                    // ignore: deprecated_member_use
                     value: selectedPrinterName,
                     decoration: InputDecoration(
                       labelText: l10n.printerName,
@@ -1042,7 +1049,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Radio<bool>(
                               value: true,
+                              // ignore: deprecated_member_use
                               groupValue: isPortrait,
+                              // ignore: deprecated_member_use
                               onChanged: (value) {
                                 setDialogState(() {
                                   isPortrait = value ?? true;
@@ -1065,7 +1074,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Radio<bool>(
                               value: false,
+                              // ignore: deprecated_member_use
                               groupValue: isPortrait,
+                              // ignore: deprecated_member_use
                               onChanged: (value) {
                                 setDialogState(() {
                                   isPortrait = value ?? false;
@@ -1376,6 +1387,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleImportRawMaterials(BuildContext context, AppLocalizations l10n) async {
+    if (!mounted) return;
+    final productBloc = context.read<ProductBloc>();
     try {
       final result = await ExcelImporter.pickExcelFile();
       if (result == null || result.files.isEmpty) {
@@ -1384,7 +1397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final filePath = result.files.single.path;
       if (filePath == null) {
-        if (context.mounted) {
+        if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(l10n.failedToGetFilePath),
@@ -1394,14 +1407,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         return;
       }
-
-      final productBloc = context.read<ProductBloc>();
       bool success = false;
       String message = '';
 
       try {
         // Import raw materials with isPosOnly = false (default)
         final items = await ExcelImporter.importRawMaterials(filePath);
+        if (!mounted) return;
         if (items.isEmpty) {
           message = 'No raw materials found in the file.';
         } else {
@@ -1447,7 +1459,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (isMaster)
             Chip(
               label: Text(l10n.masterDevice),
-              backgroundColor: AppColors.primary.withOpacity(0.2),
+              backgroundColor: AppColors.primary.withValues(alpha: 0.2),
               labelStyle: TextStyle(color: AppColors.primary, fontSize: 12),
             ),
           if (isCurrentDevice && !isMaster)
@@ -1671,6 +1683,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ] else ...[
                     const SizedBox(height: AppSpacing.sm),
                     DropdownButtonFormField<String>(
+                      // ignore: deprecated_member_use
                       value: selectedRole,
                       decoration: InputDecoration(
                         labelText: l10n.role,
@@ -1893,8 +1906,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
 
                     if (!mounted) return;
-                    Navigator.pop(dialogContext);
-                    if (mounted) {
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
+                    if (mounted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Password changed successfully'),
@@ -1904,12 +1919,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     }
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error changing password: ${e.toString()}'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error changing password: ${e.toString()}'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    }
                   }
                 },
               ),
@@ -2050,9 +2067,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   await Future.delayed(const Duration(milliseconds: 500));
 
                   if (!mounted) return;
-                  Navigator.pop(dialogContext);
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
                   
-                  if (mounted) {
+                  if (mounted && context.mounted) {
                     final successL10n = AppLocalizations.of(context)!;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -2094,8 +2113,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Silently fail - user can manually enter or use refresh button
     }
 
+    if (!mounted) return;
+    final navigatorContext = context;
+    if (!navigatorContext.mounted) return;
     showDialog(
-      context: context,
+      context: navigatorContext,
       builder: (dialogContext) => StatefulBuilder(
         builder: (innerContext, setDialogState) => AlertDialog(
           title: Text(l10n.addDevice),
@@ -2139,20 +2161,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   macAddressController.text = macAddress;
                                 } else {
                                   // If physical MAC not available, show error
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      SnackBar(
+                                        content: const Text('Physical MAC address not available. Please enter manually.'),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (innerContext.mounted) {
+                                  ScaffoldMessenger.of(innerContext).showSnackBar(
                                     SnackBar(
-                                      content: const Text('Physical MAC address not available. Please enter manually.'),
+                                      content: Text('Failed to get MAC address: $e'),
                                       backgroundColor: AppColors.error,
                                     ),
                                   );
                                 }
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Failed to get MAC address: $e'),
-                                    backgroundColor: AppColors.error,
-                                  ),
-                                );
                               } finally {
                                 setDialogState(() {
                                   isLoadingMac = false;
@@ -2365,6 +2391,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<int?>(
+                                  // ignore: deprecated_member_use
                                   value: deviceFloors[device.deviceId] ?? device.floor,
                                   decoration: InputDecoration(
                                     labelText: l10n.floor,
@@ -2401,7 +2428,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),

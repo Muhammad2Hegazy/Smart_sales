@@ -186,6 +186,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _handleImportCategories(BuildContext context, AppLocalizations l10n) async {
+    if (!mounted) return;
+    final productBloc = context.read<ProductBloc>();
     try {
       final result = await ExcelImporter.pickExcelFile();
       if (result == null || result.files.isEmpty) {
@@ -194,7 +196,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
       final filePath = result.files.single.path;
       if (filePath == null) {
-        if (context.mounted) {
+        if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to get file path'),
@@ -204,8 +206,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
         }
         return;
       }
-
-      final productBloc = context.read<ProductBloc>();
       bool success = false;
       String message = '';
 
@@ -215,9 +215,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
         if (categories.isEmpty) {
           message = 'No categories found in the file.';
         } else {
+          if (!mounted) return;
           productBloc.add(ImportCategories(categories));
           // Wait for import to complete and database to update
           await Future.delayed(const Duration(milliseconds: 300));
+          if (!mounted) return;
           productBloc.add(const LoadProducts());
           success = true;
           message = 'Categories imported successfully (${categories.length} categories).';
@@ -226,6 +228,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
         message = 'Error importing categories: $e';
       }
 
+      if (!mounted) return;
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -248,6 +251,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _handleImportSubCategories(BuildContext context, AppLocalizations l10n) async {
+    if (!mounted) return;
+    final productBloc = context.read<ProductBloc>();
     try {
       final result = await ExcelImporter.pickExcelFile();
       if (result == null || result.files.isEmpty) {
@@ -256,7 +261,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
       final filePath = result.files.single.path;
       if (filePath == null) {
-        if (context.mounted) {
+        if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to get file path'),
@@ -266,8 +271,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
         }
         return;
       }
-
-      final productBloc = context.read<ProductBloc>();
       bool success = false;
       String message = '';
 
@@ -277,9 +280,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
         if (subCategories.isEmpty) {
           message = 'No subcategories found in the file.';
         } else {
+          if (!mounted) return;
           productBloc.add(ImportSubCategories(subCategories));
           // Wait for import to complete and database to update
           await Future.delayed(const Duration(milliseconds: 300));
+          if (!mounted) return;
           productBloc.add(const LoadProducts());
           success = true;
           message = 'Sub Categories imported successfully (${subCategories.length} subcategories).';
@@ -288,6 +293,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
         message = 'Error importing subcategories: $e';
       }
 
+      if (!mounted) return;
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -310,6 +316,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _handleImportItems(BuildContext context, AppLocalizations l10n) async {
+    if (!mounted) return;
+    final productBloc = context.read<ProductBloc>();
     try {
       final result = await ExcelImporter.pickExcelFile();
       if (result == null || result.files.isEmpty) {
@@ -318,7 +326,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
       final filePath = result.files.single.path;
       if (filePath == null) {
-        if (context.mounted) {
+        if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to get file path'),
@@ -328,8 +336,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
         }
         return;
       }
-
-      final productBloc = context.read<ProductBloc>();
       bool success = false;
       String message = '';
 
@@ -580,6 +586,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             DropdownButtonFormField<Category>(
+                              // ignore: deprecated_member_use
                               value: selectedCategory,
                               decoration: InputDecoration(
                                 border: OutlineInputBorder(
@@ -664,6 +671,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                               ),
                               const SizedBox(height: AppSpacing.xs),
                               DropdownButtonFormField<SubCategory>(
+                                // ignore: deprecated_member_use
                                 value: selectedSubCategory,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(

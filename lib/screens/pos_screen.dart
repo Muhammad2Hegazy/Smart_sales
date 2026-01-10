@@ -487,12 +487,6 @@ class _POSContentState extends State<_POSContent> {
       
       final finalTotalWithCharges = finalTotal + serviceCharge + deliveryTax;
       
-      // Get next order and invoice numbers BEFORE saving (so we use the count before this sale)
-      final dbHelper = DatabaseHelper();
-      final nextOrderNumber = await dbHelper.getNextOrderNumber();
-      final nextInvoiceNumber = await dbHelper.getNextInvoiceNumber();
-      debugPrint('_completePayment: Using orderNumber=$nextOrderNumber, invoiceNumber=$nextInvoiceNumber');
-      
       // Save sale to database (this will be saved to reports)
       await paymentService.processPayment(
         items: cartState.items,
@@ -508,7 +502,13 @@ class _POSContentState extends State<_POSContent> {
       );
       
       // Wait a bit to ensure database save is complete
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Get next order and invoice numbers AFTER saving (so we count this sale too)
+      final dbHelper = DatabaseHelper();
+      final nextOrderNumber = await dbHelper.getNextOrderNumber();
+      final nextInvoiceNumber = await dbHelper.getNextInvoiceNumber();
+      debugPrint('_completePayment: Using orderNumber=$nextOrderNumber, invoiceNumber=$nextInvoiceNumber');
       
       // Auto-print customer invoice if printing is enabled
       if (_allowPrinting) {
@@ -543,7 +543,8 @@ class _POSContentState extends State<_POSContent> {
       }
       
       // Clear cart and reset POS screen for new invoice
-      if (mounted) {
+      if (!mounted) return;
+      if (context.mounted) {
         context.read<CartBloc>().add(const ClearCart());
       }
       

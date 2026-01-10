@@ -27,7 +27,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _selectedPeriod = 'daily';
+  final String _selectedPeriod = 'daily';
   DateTime? _selectedStartDate;
   DateTime? _selectedEndDate;
 

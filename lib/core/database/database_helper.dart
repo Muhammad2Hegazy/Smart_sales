@@ -1220,6 +1220,15 @@ class DatabaseHelper {
       final todayStartStr = todayStart.toIso8601String();
       final todayEndStr = todayEnd.toIso8601String();
       
+      debugPrint('getTodaySalesCount: Querying sales from $todayStartStr to $todayEndStr');
+      
+      // First, let's see all sales to debug
+      final allSales = await db.query('sales', columns: ['id', 'created_at'], limit: 5);
+      debugPrint('getTodaySalesCount: Sample sales in DB:');
+      for (var sale in allSales) {
+        debugPrint('  - Sale ID: ${sale['id']}, created_at: ${sale['created_at']}');
+      }
+      
       final result = await db.rawQuery(
         'SELECT COUNT(*) as count FROM sales WHERE created_at >= ? AND created_at < ?',
         [todayStartStr, todayEndStr],
@@ -1242,6 +1251,33 @@ class DatabaseHelper {
       }
       
       debugPrint('getTodaySalesCount: Found $count sales today (from $todayStartStr to $todayEndStr)');
+      
+      // Also try a simpler query using DATE() function if available
+      try {
+        final dateResult = await db.rawQuery(
+          "SELECT COUNT(*) as count FROM sales WHERE DATE(created_at) = DATE('now')",
+        );
+        if (dateResult.isNotEmpty) {
+          final dateCountValue = dateResult.first['count'];
+          int dateCount = 0;
+          if (dateCountValue is int) {
+            dateCount = dateCountValue;
+          } else if (dateCountValue is num) {
+            dateCount = dateCountValue.toInt();
+          } else {
+            dateCount = int.tryParse(dateCountValue.toString()) ?? 0;
+          }
+          debugPrint('getTodaySalesCount: Alternative query (DATE function) found $dateCount sales');
+          // Use the alternative if it gives a different result
+          if (dateCount != count) {
+            debugPrint('getTodaySalesCount: Using alternative count: $dateCount');
+            return dateCount;
+          }
+        }
+      } catch (e) {
+        debugPrint('getTodaySalesCount: Alternative query failed (may not support DATE function): $e');
+      }
+      
       return count;
     } catch (e, stackTrace) {
       debugPrint('Error getting today sales count: $e');
