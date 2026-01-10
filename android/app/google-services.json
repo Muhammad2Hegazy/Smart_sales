@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "57142414324",
+    "project_id": "queen-cafe",
+    "storage_bucket": "queen-cafe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:57142414324:android:2460d08cc0e1bb835cc7a1",
+        "android_client_info": {
+          "package_name": "com.example.smart_sales"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "57142414324-87r01nli3762v2bcccnjq8o0ko863h53.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqmtp_Us4BkVWJGBNeXha-YQgIWvM5zsE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "57142414324-87r01nli3762v2bcccnjq8o0ko863h53.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
