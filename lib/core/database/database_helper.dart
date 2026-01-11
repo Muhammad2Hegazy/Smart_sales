@@ -6,6 +6,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category.dart';
 import '../models/sub_category.dart';
 import '../models/item.dart';
@@ -16,6 +17,10 @@ import '../models/master.dart';
 import '../models/device.dart';
 import '../models/user_profile.dart';
 import '../models/user_permission.dart';
+import '../models/raw_material.dart';
+import '../models/raw_material_batch.dart';
+import '../models/recipe.dart';
+import '../models/recipe_ingredient.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -50,7 +55,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       dbPath,
-      version: 15, // Incremented for floor support
+      version: 18, // Incremented for recipes and recipe ingredients
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -291,6 +296,64 @@ class DatabaseHelper {
       )
     ''');
 
+    // Raw materials table
+    await db.execute('''
+      CREATE TABLE raw_materials (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'number',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Raw material batches table
+    await db.execute('''
+      CREATE TABLE raw_material_batches (
+        id TEXT PRIMARY KEY,
+        raw_material_id TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        expiry_date TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Create indexes for raw materials
+    await db.execute('CREATE INDEX idx_raw_material_batches_raw_material_id ON raw_material_batches(raw_material_id)');
+    await db.execute('CREATE INDEX idx_raw_material_batches_expiry_date ON raw_material_batches(expiry_date)');
+
+    // Recipes table
+    await db.execute('''
+      CREATE TABLE recipes (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Recipe ingredients table
+    await db.execute('''
+      CREATE TABLE recipe_ingredients (
+        id TEXT PRIMARY KEY,
+        recipe_id TEXT NOT NULL,
+        raw_material_id TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+        FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Create indexes for recipes
+    await db.execute('CREATE INDEX idx_recipes_item_id ON recipes(item_id)');
+    await db.execute('CREATE INDEX idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id)');
+    await db.execute('CREATE INDEX idx_recipe_ingredients_raw_material_id ON recipe_ingredients(raw_material_id)');
+
     // Create indexes for user tables
     await db.execute('CREATE INDEX idx_user_profiles_username ON user_profiles(username)');
     await db.execute('CREATE INDEX idx_user_profiles_role ON user_profiles(role)');
@@ -438,6 +501,69 @@ class DatabaseHelper {
       // Add floor column to devices table
       await _addFloorToDevices(db);
     }
+    
+    if (oldVersion < 16) {
+      // Add device_id column to sales table
+      await _addDeviceIdToSales(db);
+    }
+    
+    if (oldVersion < 17) {
+      // Add raw materials tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_materials (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          unit TEXT NOT NULL DEFAULT 'number',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_material_batches (
+          id TEXT PRIMARY KEY,
+          raw_material_id TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          expiry_date TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_batches_raw_material_id ON raw_material_batches(raw_material_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_batches_expiry_date ON raw_material_batches(expiry_date)');
+    }
+    
+    if (oldVersion < 18) {
+      // Add recipes tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS recipes (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS recipe_ingredients (
+          id TEXT PRIMARY KEY,
+          recipe_id TEXT NOT NULL,
+          raw_material_id TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+          FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_recipes_item_id ON recipes(item_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_raw_material_id ON recipe_ingredients(raw_material_id)');
+    }
   }
   
   /// Add mac_address column to devices table
@@ -467,6 +593,26 @@ class DatabaseHelper {
         debugPrint('Error ensuring developer device in migration: $e');
       }
     });
+  }
+  
+  /// Add device_id column to sales table
+  Future<void> _addDeviceIdToSales(Database db) async {
+    try {
+      // Check if column already exists
+      final result = await db.rawQuery("PRAGMA table_info(sales)");
+      final hasDeviceId = result.any((row) => row['name'] == 'device_id');
+      
+      if (!hasDeviceId) {
+        await db.execute('ALTER TABLE sales ADD COLUMN device_id TEXT');
+      }
+    } catch (e) {
+      debugPrint('Error adding device_id column to sales: $e');
+      try {
+        await db.execute('ALTER TABLE sales ADD COLUMN device_id TEXT');
+      } catch (e2) {
+        debugPrint('Error adding device_id to sales: $e2');
+      }
+    }
   }
   
   /// Add floor column to devices table
@@ -565,6 +711,62 @@ class DatabaseHelper {
       } catch (e2) {
         debugPrint('Error adding hospitality_tax: $e2');
       }
+    }
+  }
+
+  /// Ensure sales table has all required columns (called before insert/update operations)
+  Future<void> _ensureSalesTableColumns(Database db) async {
+    try {
+      final result = await db.rawQuery("PRAGMA table_info(sales)");
+      final columnNames = result.map((row) => row['name'] as String).toSet();
+      
+      // Check and add missing columns
+      if (!columnNames.contains('discount_percentage')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN discount_percentage REAL NOT NULL DEFAULT 0.0');
+        debugPrint('Added discount_percentage column to sales table');
+      }
+      
+      if (!columnNames.contains('discount_amount')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0.0');
+        debugPrint('Added discount_amount column to sales table');
+      }
+      
+      if (!columnNames.contains('service_charge')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN service_charge REAL NOT NULL DEFAULT 0.0');
+        debugPrint('Added service_charge column to sales table');
+      }
+      
+      if (!columnNames.contains('delivery_tax')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN delivery_tax REAL NOT NULL DEFAULT 0.0');
+        debugPrint('Added delivery_tax column to sales table');
+      }
+      
+      if (!columnNames.contains('hospitality_tax')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN hospitality_tax REAL NOT NULL DEFAULT 0.0');
+        debugPrint('Added hospitality_tax column to sales table');
+      }
+      
+      if (!columnNames.contains('device_id')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN device_id TEXT');
+        debugPrint('Added device_id column to sales table');
+      }
+      
+      if (!columnNames.contains('master_device_id')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN master_device_id TEXT NOT NULL DEFAULT \'\'');
+        debugPrint('Added master_device_id column to sales table');
+      }
+      
+      if (!columnNames.contains('sync_status')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN sync_status TEXT NOT NULL DEFAULT \'pending\'');
+        debugPrint('Added sync_status column to sales table');
+      }
+      
+      if (!columnNames.contains('updated_at')) {
+        await db.execute('ALTER TABLE sales ADD COLUMN updated_at TEXT NOT NULL DEFAULT \'\'');
+        debugPrint('Added updated_at column to sales table');
+      }
+    } catch (e) {
+      debugPrint('Error ensuring sales table columns: $e');
     }
   }
 
@@ -1117,20 +1319,33 @@ class DatabaseHelper {
   Future<void> insertSale(Sale sale) async {
     final db = await database;
     
+    // Ensure sales table has all required columns
+    await _ensureSalesTableColumns(db);
+    
     // Get master device ID for sync
     final master = await getMaster();
     final masterDeviceId = master?.masterDeviceId ?? '';
     final now = DateTime.now().toIso8601String();
     
+    // Get current device ID from SharedPreferences
+    String? currentDeviceId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      currentDeviceId = prefs.getString('current_device_id');
+    } catch (e) {
+      debugPrint('Error getting current device ID: $e');
+    }
+    
     final batch = db.batch();
     
-    // Insert sale with sync fields
+    // Insert sale with sync fields and device_id
     batch.insert(
       'sales',
       sale.toMap(
         masterDeviceId: masterDeviceId,
         syncStatus: 'pending', // Mark as pending for sync
         updatedAt: now,
+        deviceId: currentDeviceId ?? sale.deviceId,
       ),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -1306,6 +1521,35 @@ class DatabaseHelper {
       'sales',
       where: 'created_at >= ? AND created_at <= ?',
       whereArgs: [startDate.toIso8601String(), endDate.toIso8601String()],
+      orderBy: 'created_at DESC',
+    );
+    
+    final List<Sale> sales = [];
+    for (var saleMap in saleMaps) {
+      final sale = Sale.fromMap(saleMap);
+      final items = await getSaleItemsBySaleId(sale.id);
+      sales.add(sale.copyWith(items: items));
+    }
+    
+    return sales;
+  }
+
+  /// Get sales by device IDs and date range
+  Future<List<Sale>> getSalesByDeviceIdsAndDateRange(
+    List<String> deviceIds,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    if (deviceIds.isEmpty) {
+      return [];
+    }
+    
+    final db = await database;
+    final placeholders = deviceIds.map((_) => '?').join(',');
+    final List<Map<String, dynamic>> saleMaps = await db.query(
+      'sales',
+      where: 'device_id IN ($placeholders) AND created_at >= ? AND created_at <= ?',
+      whereArgs: [...deviceIds, startDate.toIso8601String(), endDate.toIso8601String()],
       orderBy: 'created_at DESC',
     );
     
@@ -1783,6 +2027,26 @@ class DatabaseHelper {
     return Device.fromMap(maps.first);
   }
 
+  /// Get devices by floor
+  Future<List<Device>> getDevicesByFloor(int? floor) async {
+    final db = await database;
+    if (floor == null) {
+      // Get devices with no floor assigned
+      final List<Map<String, dynamic>> maps = await db.query(
+        'devices',
+        where: 'floor IS NULL',
+      );
+      return maps.map((map) => Device.fromMap(map)).toList();
+    } else {
+      final List<Map<String, dynamic>> maps = await db.query(
+        'devices',
+        where: 'floor = ?',
+        whereArgs: [floor],
+      );
+      return maps.map((map) => Device.fromMap(map)).toList();
+    }
+  }
+
   /// Ensure developer device is always registered
   /// Developer MAC: E0:0A:F6:C3:BA:FF
   Future<void> _ensureDeveloperDeviceRegistered() async {
@@ -1851,6 +2115,386 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // Raw Materials CRUD
+  Future<void> insertRawMaterial(RawMaterial material) async {
+    final db = await database;
+    await db.insert(
+      'raw_materials',
+      material.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> insertRawMaterials(List<RawMaterial> materials) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var material in materials) {
+      batch.insert(
+        'raw_materials',
+        material.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<RawMaterial>> getAllRawMaterials() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('raw_materials', orderBy: 'name ASC');
+    final materials = <RawMaterial>[];
+    
+    // Load batches for each material
+    for (var map in maps) {
+      final material = RawMaterial.fromMap(map);
+      final batches = await getRawMaterialBatches(material.id);
+      materials.add(material.copyWith(batches: batches));
+    }
+    
+    return materials;
+  }
+
+  Future<RawMaterial?> getRawMaterialById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_materials',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    final material = RawMaterial.fromMap(maps.first);
+    final batches = await getRawMaterialBatches(id);
+    return material.copyWith(batches: batches);
+  }
+
+  Future<void> updateRawMaterial(RawMaterial material) async {
+    final db = await database;
+    await db.update(
+      'raw_materials',
+      material.toMap(),
+      where: 'id = ?',
+      whereArgs: [material.id],
+    );
+  }
+
+  Future<void> deleteRawMaterial(String id) async {
+    final db = await database;
+    // Batches will be deleted automatically due to CASCADE
+    await db.delete('raw_materials', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Raw Material Batches CRUD
+  Future<void> insertRawMaterialBatch(RawMaterialBatch batch) async {
+    final db = await database;
+    await db.insert(
+      'raw_material_batches',
+      batch.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    
+    // Update raw material updated_at
+    await db.update(
+      'raw_materials',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [batch.rawMaterialId],
+    );
+  }
+
+  Future<void> insertRawMaterialBatches(List<RawMaterialBatch> batches) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var batchItem in batches) {
+      batch.insert(
+        'raw_material_batches',
+        batchItem.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<RawMaterialBatch>> getRawMaterialBatches(String rawMaterialId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_material_batches',
+      where: 'raw_material_id = ?',
+      whereArgs: [rawMaterialId],
+      orderBy: 'expiry_date ASC',
+    );
+    return maps.map((map) => RawMaterialBatch.fromMap(map)).toList();
+  }
+
+  Future<RawMaterialBatch?> getRawMaterialBatchById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_material_batches',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return RawMaterialBatch.fromMap(maps.first);
+  }
+
+  Future<void> updateRawMaterialBatch(RawMaterialBatch batch) async {
+    final db = await database;
+    await db.update(
+      'raw_material_batches',
+      batch.toMap(),
+      where: 'id = ?',
+      whereArgs: [batch.id],
+    );
+    
+    // Update raw material updated_at
+    await db.update(
+      'raw_materials',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [batch.rawMaterialId],
+    );
+  }
+
+  Future<void> deleteRawMaterialBatch(String id) async {
+    final db = await database;
+    // Get batch to update raw material
+    final batch = await getRawMaterialBatchById(id);
+    await db.delete('raw_material_batches', where: 'id = ?', whereArgs: [id]);
+    
+    if (batch != null) {
+      // Update raw material updated_at
+      await db.update(
+        'raw_materials',
+        {'updated_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [batch.rawMaterialId],
+      );
+    }
+  }
+
+  // Recipes CRUD
+  Future<void> insertRecipe(Recipe recipe) async {
+    final db = await database;
+    await db.insert(
+      'recipes',
+      recipe.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> insertRecipes(List<Recipe> recipes) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var recipe in recipes) {
+      batch.insert(
+        'recipes',
+        recipe.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<Recipe?> getRecipeByItemId(String itemId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'recipes',
+      where: 'item_id = ?',
+      whereArgs: [itemId],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    final recipe = Recipe.fromMap(maps.first);
+    final ingredients = await getRecipeIngredients(recipe.id);
+    return recipe.copyWith(ingredients: ingredients);
+  }
+
+  Future<List<Recipe>> getAllRecipes() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('recipes');
+    final recipes = <Recipe>[];
+    
+    for (var map in maps) {
+      final recipe = Recipe.fromMap(map);
+      final ingredients = await getRecipeIngredients(recipe.id);
+      recipes.add(recipe.copyWith(ingredients: ingredients));
+    }
+    
+    return recipes;
+  }
+
+  Future<void> updateRecipe(Recipe recipe) async {
+    final db = await database;
+    await db.update(
+      'recipes',
+      recipe.toMap(),
+      where: 'id = ?',
+      whereArgs: [recipe.id],
+    );
+  }
+
+  Future<void> deleteRecipe(String id) async {
+    final db = await database;
+    // Ingredients will be deleted automatically due to CASCADE
+    await db.delete('recipes', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Recipe Ingredients CRUD
+  Future<void> insertRecipeIngredient(RecipeIngredient ingredient) async {
+    final db = await database;
+    await db.insert(
+      'recipe_ingredients',
+      ingredient.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    
+    // Update recipe updated_at
+    await db.update(
+      'recipes',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [ingredient.recipeId],
+    );
+  }
+
+  Future<void> insertRecipeIngredients(List<RecipeIngredient> ingredients) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var ingredient in ingredients) {
+      batch.insert(
+        'recipe_ingredients',
+        ingredient.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<RecipeIngredient>> getRecipeIngredients(String recipeId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'recipe_ingredients',
+      where: 'recipe_id = ?',
+      whereArgs: [recipeId],
+    );
+    return maps.map((map) => RecipeIngredient.fromMap(map)).toList();
+  }
+
+  Future<void> updateRecipeIngredient(RecipeIngredient ingredient) async {
+    final db = await database;
+    await db.update(
+      'recipe_ingredients',
+      ingredient.toMap(),
+      where: 'id = ?',
+      whereArgs: [ingredient.id],
+    );
+    
+    // Update recipe updated_at
+    await db.update(
+      'recipes',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [ingredient.recipeId],
+    );
+  }
+
+  Future<void> deleteRecipeIngredient(String id) async {
+    final db = await database;
+    // Get ingredient to update recipe
+    final ingredient = await getRecipeIngredientById(id);
+    await db.delete('recipe_ingredients', where: 'id = ?', whereArgs: [id]);
+    
+    if (ingredient != null) {
+      // Update recipe updated_at
+      await db.update(
+        'recipes',
+        {'updated_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [ingredient.recipeId],
+      );
+    }
+  }
+
+  Future<RecipeIngredient?> getRecipeIngredientById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'recipe_ingredients',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return RecipeIngredient.fromMap(maps.first);
+  }
+
+  // Inventory deduction methods
+  /// Deduct raw materials from inventory based on recipe when item is sold
+  Future<void> deductInventoryForSale(String itemId, int quantity) async {
+    debugPrint('deductInventoryForSale called: itemId=$itemId, quantity=$quantity');
+    final recipe = await getRecipeByItemId(itemId);
+    if (recipe == null || recipe.ingredients.isEmpty) {
+      // No recipe found, nothing to deduct
+      debugPrint('No recipe found for itemId=$itemId or recipe has no ingredients');
+      return;
+    }
+    
+    debugPrint('Recipe found for itemId=$itemId with ${recipe.ingredients.length} ingredients');
+    
+    // For each ingredient in the recipe, deduct the required quantity
+    for (var ingredient in recipe.ingredients) {
+      final requiredQuantity = ingredient.quantity * quantity;
+      debugPrint('Processing ingredient: rawMaterialId=${ingredient.rawMaterialId}, quantityPerUnit=${ingredient.quantity}, totalRequired=$requiredQuantity');
+      
+      // Get all batches for this raw material, ordered by expiry date (FIFO)
+      final batches = await getRawMaterialBatches(ingredient.rawMaterialId);
+      debugPrint('Found ${batches.length} batches for raw material ${ingredient.rawMaterialId}');
+      batches.sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
+      
+      double remainingToDeduct = requiredQuantity;
+      double totalDeducted = 0.0;
+      
+      for (var batch in batches) {
+        if (remainingToDeduct <= 0) break;
+        
+        if (batch.quantity > 0) {
+          final toDeduct = remainingToDeduct > batch.quantity 
+              ? batch.quantity 
+              : remainingToDeduct;
+          
+          debugPrint('Deducting $toDeduct from batch ${batch.id} (current quantity: ${batch.quantity})');
+          
+          final newQuantity = batch.quantity - toDeduct;
+          
+          if (newQuantity <= 0) {
+            // Delete batch if quantity becomes zero or negative
+            debugPrint('Deleting batch ${batch.id} (quantity would be $newQuantity)');
+            await deleteRawMaterialBatch(batch.id);
+          } else {
+            // Update batch with new quantity
+            final updatedBatch = batch.copyWith(
+              quantity: newQuantity,
+              updatedAt: DateTime.now(),
+            );
+            debugPrint('Updating batch ${batch.id} to quantity $newQuantity');
+            await updateRawMaterialBatch(updatedBatch);
+          }
+          
+          totalDeducted += toDeduct;
+          remainingToDeduct -= toDeduct;
+        }
+      }
+      
+      debugPrint('Total deducted: $totalDeducted, Remaining: $remainingToDeduct');
+      
+      // If we couldn't deduct all required quantity, log a warning
+      if (remainingToDeduct > 0) {
+        debugPrint('Warning: Could not deduct full quantity for raw material ${ingredient.rawMaterialId}. Required: $requiredQuantity, Deducted: ${requiredQuantity - remainingToDeduct}');
+      } else {
+        debugPrint('Successfully deducted $totalDeducted for raw material ${ingredient.rawMaterialId}');
+      }
+    }
   }
 
   // Close database

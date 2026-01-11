@@ -1582,4 +1582,97 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get floorsUpdatedSuccessfully => 'تم تحديث الأدوار بنجاح';
+
+  @override
+  String get expiryDate => 'تاريخ الصلاحية';
+
+  @override
+  String get editMaterial => 'تعديل المادة';
+
+  @override
+  String get addBatch => 'إضافة دفعة';
+
+  @override
+  String get batchExpiryDate => 'تاريخ صلاحية الدفعة';
+
+  @override
+  String get materialQuantity => 'كمية المادة';
+
+  @override
+  String get materialUnit => 'وحدة المادة';
+
+  @override
+  String get pleaseEnterQuantity => 'يرجى إدخال الكمية';
+
+  @override
+  String get pleaseSelectExpiryDate => 'يرجى اختيار تاريخ الصلاحية';
+
+  @override
+  String get batchAddedSuccessfully => 'تمت إضافة الدفعة بنجاح';
+
+  @override
+  String get batchUpdatedSuccessfully => 'تم تحديث الدفعة بنجاح';
+
+  @override
+  String get materialNameColumn => 'اسم المادة';
+
+  @override
+  String get quantityColumn => 'الكمية';
+
+  @override
+  String get expiryDateColumn => 'تاريخ الصلاحية';
+
+  @override
+  String get recipe => 'الوصفة';
+
+  @override
+  String get recipeManagement => 'إدارة الوصفات';
+
+  @override
+  String get manageRecipe => 'إدارة الوصفة';
+
+  @override
+  String get recipeIngredients => 'مكونات الوصفة';
+
+  @override
+  String get addIngredient => 'إضافة مكون';
+
+  @override
+  String get selectRawMaterial => 'اختر المادة الخام';
+
+  @override
+  String get ingredientQuantity => 'كمية المكون';
+
+  @override
+  String get pleaseSelectRawMaterial => 'يرجى اختيار المادة الخام';
+
+  @override
+  String get pleaseEnterIngredientQuantity => 'يرجى إدخال كمية المكون';
+
+  @override
+  String get ingredientAddedSuccessfully => 'تمت إضافة المكون بنجاح';
+
+  @override
+  String get ingredientUpdatedSuccessfully => 'تم تحديث المكون بنجاح';
+
+  @override
+  String get ingredientDeletedSuccessfully => 'تم حذف المكون بنجاح';
+
+  @override
+  String get recipeCreatedSuccessfully => 'تم إنشاء الوصفة بنجاح';
+
+  @override
+  String get recipeUpdatedSuccessfully => 'تم تحديث الوصفة بنجاح';
+
+  @override
+  String get noRecipeFound => 'لا توجد وصفة لهذا المنتج';
+
+  @override
+  String get createRecipe => 'إنشاء وصفة';
+
+  @override
+  String get editIngredient => 'تعديل المكون';
+
+  @override
+  String get deleteIngredient => 'حذف المكون';
 }

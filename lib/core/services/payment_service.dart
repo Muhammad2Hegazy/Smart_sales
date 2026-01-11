@@ -1,7 +1,9 @@
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import '../models/sale.dart';
 import '../models/cart_item.dart';
 import '../models/financial_transaction.dart';
+import '../database/database_helper.dart';
 import '../../bloc/sales/sales_bloc.dart';
 import '../../bloc/sales/sales_event.dart';
 import '../../bloc/financial/financial_bloc.dart';
@@ -62,8 +64,55 @@ class PaymentService {
       hospitalityTax: hospitalityTax,
     );
 
-    // Save sale to database via BLoC
+    // Save sale to database directly first (to ensure it's saved)
+    final dbHelper = DatabaseHelper();
+    await dbHelper.insertSale(sale);
+    
+    // Save sale to database via BLoC (for state management)
     _salesBloc.add(AddSale(sale));
+    
+    // Deduct inventory for each item in the sale
+    try {
+      debugPrint('═══════════════════════════════════════════════════════');
+      debugPrint('Starting inventory deduction for sale ${sale.id}');
+      debugPrint('═══════════════════════════════════════════════════════');
+      
+      for (var saleItem in saleItems) {
+        debugPrint('');
+        debugPrint('Processing item: ${saleItem.itemName}');
+        debugPrint('  - Item ID: ${saleItem.itemId}');
+        debugPrint('  - Quantity: ${saleItem.quantity}');
+        
+        final recipe = await dbHelper.getRecipeByItemId(saleItem.itemId);
+        if (recipe == null) {
+          debugPrint('  ⚠️  WARNING: No recipe found for item "${saleItem.itemName}"');
+          debugPrint('  → To enable inventory deduction, please add a recipe for this item in the Items screen');
+          continue; // Skip this item
+        }
+        
+        if (recipe.ingredients.isEmpty) {
+          debugPrint('  ⚠️  WARNING: Recipe found but has no ingredients');
+          debugPrint('  → Please add ingredients to the recipe in the Items screen');
+          continue; // Skip this item
+        }
+        
+        debugPrint('  ✓ Recipe found with ${recipe.ingredients.length} ingredient(s)');
+        
+        // Deduct inventory
+        await dbHelper.deductInventoryForSale(saleItem.itemId, saleItem.quantity);
+        debugPrint('  ✓ Inventory deduction completed for ${saleItem.itemName}');
+      }
+      
+      debugPrint('');
+      debugPrint('═══════════════════════════════════════════════════════');
+      debugPrint('Inventory deduction process completed for sale ${sale.id}');
+      debugPrint('═══════════════════════════════════════════════════════');
+    } catch (e, stackTrace) {
+      // Log error but don't fail the sale - inventory deduction is important but shouldn't block sales
+      debugPrint('');
+      debugPrint('❌ ERROR deducting inventory for sale ${sale.id}: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
     
     // Record financial transaction (cash in)
     final transaction = FinancialTransaction(

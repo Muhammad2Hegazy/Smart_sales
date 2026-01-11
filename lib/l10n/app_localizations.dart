@@ -3196,6 +3196,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Floors updated successfully'**
   String get floorsUpdatedSuccessfully;
+
+  /// No description provided for @expiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date'**
+  String get expiryDate;
+
+  /// No description provided for @editMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Material'**
+  String get editMaterial;
+
+  /// No description provided for @addBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Batch'**
+  String get addBatch;
+
+  /// No description provided for @batchExpiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Expiry Date'**
+  String get batchExpiryDate;
+
+  /// No description provided for @materialQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Material Quantity'**
+  String get materialQuantity;
+
+  /// No description provided for @materialUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Material Unit'**
+  String get materialUnit;
+
+  /// No description provided for @pleaseEnterQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter quantity'**
+  String get pleaseEnterQuantity;
+
+  /// No description provided for @pleaseSelectExpiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select expiry date'**
+  String get pleaseSelectExpiryDate;
+
+  /// No description provided for @batchAddedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch added successfully'**
+  String get batchAddedSuccessfully;
+
+  /// No description provided for @batchUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch updated successfully'**
+  String get batchUpdatedSuccessfully;
+
+  /// No description provided for @materialNameColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Material Name'**
+  String get materialNameColumn;
+
+  /// No description provided for @quantityColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get quantityColumn;
+
+  /// No description provided for @expiryDateColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date'**
+  String get expiryDateColumn;
+
+  /// No description provided for @recipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipe'**
+  String get recipe;
+
+  /// No description provided for @recipeManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipe Management'**
+  String get recipeManagement;
+
+  /// No description provided for @manageRecipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Recipe'**
+  String get manageRecipe;
+
+  /// No description provided for @recipeIngredients.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipe Ingredients'**
+  String get recipeIngredients;
+
+  /// No description provided for @addIngredient.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Ingredient'**
+  String get addIngredient;
+
+  /// No description provided for @selectRawMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Raw Material'**
+  String get selectRawMaterial;
+
+  /// No description provided for @ingredientQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredient Quantity'**
+  String get ingredientQuantity;
+
+  /// No description provided for @pleaseSelectRawMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select raw material'**
+  String get pleaseSelectRawMaterial;
+
+  /// No description provided for @pleaseEnterIngredientQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter ingredient quantity'**
+  String get pleaseEnterIngredientQuantity;
+
+  /// No description provided for @ingredientAddedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredient added successfully'**
+  String get ingredientAddedSuccessfully;
+
+  /// No description provided for @ingredientUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredient updated successfully'**
+  String get ingredientUpdatedSuccessfully;
+
+  /// No description provided for @ingredientDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredient deleted successfully'**
+  String get ingredientDeletedSuccessfully;
+
+  /// No description provided for @recipeCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipe created successfully'**
+  String get recipeCreatedSuccessfully;
+
+  /// No description provided for @recipeUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipe updated successfully'**
+  String get recipeUpdatedSuccessfully;
+
+  /// No description provided for @noRecipeFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No recipe found for this product'**
+  String get noRecipeFound;
+
+  /// No description provided for @createRecipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Recipe'**
+  String get createRecipe;
+
+  /// No description provided for @editIngredient.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Ingredient'**
+  String get editIngredient;
+
+  /// No description provided for @deleteIngredient.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Ingredient'**
+  String get deleteIngredient;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

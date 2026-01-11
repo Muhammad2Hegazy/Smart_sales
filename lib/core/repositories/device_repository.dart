@@ -126,6 +126,10 @@ class DeviceRepository {
     await _deviceLocalDataSource.updateDeviceFloor(deviceId, floor);
   }
 
+  Future<List<Device>> getDevicesByFloor(int? floor) async {
+    return await _deviceLocalDataSource.getDevicesByFloor(floor);
+  }
+
   Future<String> getCurrentDeviceId() async {
     return _uuid.v4();
   }

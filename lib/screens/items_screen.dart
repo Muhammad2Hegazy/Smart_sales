@@ -8,12 +8,16 @@ import '../core/theme/app_border_radius.dart';
 import '../core/models/item.dart';
 import '../core/models/category.dart';
 import '../core/models/sub_category.dart';
+import '../core/models/recipe.dart';
+import '../core/models/recipe_ingredient.dart';
+import '../core/models/raw_material.dart';
 import '../core/utils/currency_formatter.dart';
 import '../core/utils/excel_importer.dart';
 import '../core/database/database_helper.dart';
 import '../bloc/product/product_bloc.dart';
 import '../bloc/product/product_event.dart';
 import '../bloc/product/product_state.dart';
+import 'package:uuid/uuid.dart';
 
 class ItemsScreen extends StatefulWidget {
   const ItemsScreen({super.key});
@@ -1268,6 +1272,12 @@ class _ItemsScreenState extends State<ItemsScreen> {
                           ),
                         ),
                         IconButton(
+                          icon: const Icon(Icons.restaurant_menu, size: 20),
+                          color: AppColors.primary,
+                          onPressed: () => _showManageRecipeDialog(context, item, l10n),
+                          tooltip: l10n.manageRecipe,
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.edit, size: 20),
                           color: AppColors.accent,
                           onPressed: () => _showEditItemDialog(context, item, productState, l10n),
@@ -1283,6 +1293,457 @@ class _ItemsScreenState extends State<ItemsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showManageRecipeDialog(BuildContext context, Item item, AppLocalizations l10n) async {
+    final dbHelper = DatabaseHelper();
+    Recipe? recipe = await dbHelper.getRecipeByItemId(item.id);
+    final rawMaterials = await dbHelper.getAllRawMaterials();
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('${l10n.manageRecipe} - ${item.name}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (recipe == null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: Text(
+                        l10n.noRecipeFound,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    )
+                  else
+                    ...(recipe?.ingredients ?? []).map((ingredient) {
+                      final material = rawMaterials.firstWhere(
+                        (m) => m.id == ingredient.rawMaterialId,
+                        orElse: () => RawMaterial(
+                          id: '',
+                          name: 'Unknown',
+                          unit: 'number',
+                          createdAt: DateTime.now(),
+                          updatedAt: DateTime.now(),
+                        ),
+                      );
+                      return ListTile(
+                        title: Text(material.name),
+                        subtitle: Text('${ingredient.quantity} ${material.unit}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18),
+                              onPressed: () async {
+                                await _showEditIngredientDialog(
+                                  dialogContext,
+                                  l10n,
+                                  recipe!,
+                                  ingredient,
+                                  material,
+                                  rawMaterials,
+                                  () async {
+                                    recipe = await dbHelper.getRecipeByItemId(item.id);
+                                    setDialogState(() {});
+                                  },
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, size: 18, color: AppColors.error),
+                              onPressed: () async {
+                                await dbHelper.deleteRecipeIngredient(ingredient.id);
+                                recipe = await dbHelper.getRecipeByItemId(item.id);
+                                setDialogState(() {});
+                                if (dialogContext.mounted) {
+                                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                    SnackBar(
+                                      content: Text(l10n.ingredientDeletedSuccessfully),
+                                      backgroundColor: AppColors.secondary,
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  const Divider(),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      if (recipe == null) {
+                        // Create new recipe
+                        final newRecipe = Recipe(
+                          id: const Uuid().v4(),
+                          itemId: item.id,
+                          createdAt: DateTime.now(),
+                          updatedAt: DateTime.now(),
+                        );
+                        await dbHelper.insertRecipe(newRecipe);
+                        recipe = await dbHelper.getRecipeByItemId(item.id);
+                        setDialogState(() {});
+                        if (dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.recipeCreatedSuccessfully),
+                              backgroundColor: AppColors.secondary,
+                            ),
+                          );
+                        }
+                      }
+                      
+                      // Add ingredient
+                      await _showAddIngredientDialog(
+                        dialogContext,
+                        l10n,
+                        recipe!,
+                        rawMaterials,
+                        () async {
+                          recipe = await dbHelper.getRecipeByItemId(item.id);
+                          setDialogState(() {});
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: Text(recipe == null ? l10n.createRecipe : l10n.addIngredient),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.close),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddIngredientDialog(
+    BuildContext context,
+    AppLocalizations l10n,
+    Recipe recipe,
+    List<RawMaterial> rawMaterials,
+    VoidCallback onSuccess,
+  ) async {
+    final dbHelper = DatabaseHelper();
+    RawMaterial? selectedMaterial;
+    final quantityController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(l10n.addIngredient),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.selectRawMaterial,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                DropdownButtonFormField<RawMaterial>(
+                  value: selectedMaterial,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
+                  items: rawMaterials.map((material) {
+                    return DropdownMenuItem<RawMaterial>(
+                      value: material,
+                      child: Text(material.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedMaterial = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  l10n.ingredientQuantity,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: quantityController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    ),
+                    hintText: l10n.pleaseEnterIngredientQuantity,
+                    suffixText: selectedMaterial?.unit ?? '',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedMaterial == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.pleaseSelectRawMaterial),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                if (quantityController.text.isEmpty) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.pleaseEnterIngredientQuantity),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                final quantity = double.tryParse(quantityController.text);
+                if (quantity == null || quantity <= 0) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.pleaseEnterValidQuantity),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final ingredient = RecipeIngredient(
+                    id: const Uuid().v4(),
+                    recipeId: recipe.id,
+                    rawMaterialId: selectedMaterial!.id,
+                    quantity: quantity,
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
+
+                  await dbHelper.insertRecipeIngredient(ingredient);
+                  onSuccess();
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.ingredientAddedSuccessfully),
+                        backgroundColor: AppColors.secondary,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(l10n.save),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    quantityController.dispose();
+  }
+
+  Future<void> _showEditIngredientDialog(
+    BuildContext context,
+    AppLocalizations l10n,
+    Recipe recipe,
+    RecipeIngredient ingredient,
+    RawMaterial material,
+    List<RawMaterial> rawMaterials,
+    VoidCallback onSuccess,
+  ) async {
+    final dbHelper = DatabaseHelper();
+    RawMaterial? selectedMaterial = material;
+    final quantityController = TextEditingController(text: ingredient.quantity.toStringAsFixed(2));
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(l10n.editIngredient),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.selectRawMaterial,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                DropdownButtonFormField<RawMaterial>(
+                  value: selectedMaterial,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
+                  items: rawMaterials.map((material) {
+                    return DropdownMenuItem<RawMaterial>(
+                      value: material,
+                      child: Text(material.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedMaterial = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  l10n.ingredientQuantity,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: quantityController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    ),
+                    hintText: l10n.pleaseEnterIngredientQuantity,
+                    suffixText: selectedMaterial?.unit ?? '',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedMaterial == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.pleaseSelectRawMaterial),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                if (quantityController.text.isEmpty) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.pleaseEnterIngredientQuantity),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                final quantity = double.tryParse(quantityController.text);
+                if (quantity == null || quantity <= 0) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.pleaseEnterValidQuantity),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final updatedIngredient = ingredient.copyWith(
+                    rawMaterialId: selectedMaterial!.id,
+                    quantity: quantity,
+                    updatedAt: DateTime.now(),
+                  );
+
+                  await dbHelper.updateRecipeIngredient(updatedIngredient);
+                  onSuccess();
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.ingredientUpdatedSuccessfully),
+                        backgroundColor: AppColors.secondary,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(l10n.save),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    quantityController.dispose();
   }
 }
 

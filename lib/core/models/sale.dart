@@ -10,6 +10,7 @@ class Sale {
   final double serviceCharge; // Service charge amount (for dine-in)
   final double deliveryTax; // Delivery tax amount (for delivery orders)
   final double hospitalityTax; // Hospitality tax amount (for hospitality orders)
+  final String? deviceId; // Device ID that created this sale
 
   const Sale({
     required this.id,
@@ -23,6 +24,7 @@ class Sale {
     this.serviceCharge = 0.0,
     this.deliveryTax = 0.0,
     this.hospitalityTax = 0.0,
+    this.deviceId,
   });
 
   Sale copyWith({
@@ -37,6 +39,7 @@ class Sale {
     double? serviceCharge,
     double? deliveryTax,
     double? hospitalityTax,
+    String? deviceId,
   }) {
     return Sale(
       id: id ?? this.id,
@@ -50,10 +53,11 @@ class Sale {
       serviceCharge: serviceCharge ?? this.serviceCharge,
       deliveryTax: deliveryTax ?? this.deliveryTax,
       hospitalityTax: hospitalityTax ?? this.hospitalityTax,
+      deviceId: deviceId ?? this.deviceId,
     );
   }
 
-  Map<String, dynamic> toMap({String? masterDeviceId, String? syncStatus, String? updatedAt}) {
+  Map<String, dynamic> toMap({String? masterDeviceId, String? syncStatus, String? updatedAt, String? deviceId}) {
     final map = {
       'id': id,
       'table_number': tableNumber,
@@ -66,6 +70,13 @@ class Sale {
       'delivery_tax': deliveryTax,
       'hospitality_tax': hospitalityTax,
     };
+    
+    // Add device_id if provided
+    if (deviceId != null) {
+      map['device_id'] = deviceId;
+    } else if (this.deviceId != null) {
+      map['device_id'] = this.deviceId;
+    }
     
     // Add sync fields if provided
     if (masterDeviceId != null) {
@@ -94,6 +105,7 @@ class Sale {
       serviceCharge: (map['service_charge'] as num?)?.toDouble() ?? 0.0,
       deliveryTax: (map['delivery_tax'] as num?)?.toDouble() ?? 0.0,
       hospitalityTax: (map['hospitality_tax'] as num?)?.toDouble() ?? 0.0,
+      deviceId: map['device_id'] as String?,
     );
   }
 }

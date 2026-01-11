@@ -17,6 +17,7 @@ import '../core/models/category.dart';
 import '../core/models/item.dart';
 import '../core/models/sale.dart';
 import '../core/models/financial_transaction.dart';
+import '../core/database/database_helper.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -139,7 +140,94 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   }
 
   // Sales Reports Methods
-  void _showShiftClosingReport(AppLocalizations l10n) {
+  void _showShiftClosingReport(AppLocalizations l10n) async {
+    // Show floor selection dialog first
+    final dbHelper = DatabaseHelper();
+    final allDevices = await dbHelper.getAllDevices();
+    
+    // Get unique floors (excluding null for now)
+    final floors = <int>{};
+    bool hasNullFloor = false;
+    for (var device in allDevices) {
+      if (device.floor == null) {
+        hasNullFloor = true;
+      } else {
+        floors.add(device.floor!);
+      }
+    }
+    final sortedFloors = floors.toList()..sort();
+    
+    int? selectedFloor;
+    
+    if (!mounted) return;
+    final floorResult = await showDialog<int?>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.selectDeviceAndFloor),
+        content: SingleChildScrollView(
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int?>(
+                  // ignore: deprecated_member_use
+                  value: selectedFloor,
+                  decoration: InputDecoration(
+                    labelText: l10n.floor,
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: [
+                    if (hasNullFloor)
+                      DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text(l10n.noFloor),
+                      ),
+                    ...sortedFloors.map((floor) {
+                      String floorName;
+                      if (floor == 0) {
+                        floorName = l10n.groundFloor;
+                      } else if (floor == 1) {
+                        floorName = l10n.secondFloor;
+                      } else if (floor == 2) {
+                        floorName = l10n.thirdFloor;
+                      } else {
+                        floorName = '${l10n.floor} $floor';
+                      }
+                      return DropdownMenuItem<int?>(
+                        value: floor,
+                        child: Text(floorName),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedFloor = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, selectedFloor),
+            child: Text(l10n.show),
+          ),
+        ],
+      ),
+    );
+    
+    if (floorResult == null && selectedFloor == null) {
+      return; // User cancelled
+    }
+    
+    selectedFloor = floorResult;
+    
     // Calculate shift period: from 5 AM to 4:59:59 AM next day
     final now = DateTime.now();
     DateTime shiftStart;
@@ -157,16 +245,45 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       shiftEnd = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 4, 59, 59);
     }
 
-    context.read<SalesBloc>().add(
-      LoadSalesByDateRange(
+    // Get devices for selected floor
+    List<String> deviceIds = [];
+    if (selectedFloor != null) {
+      final floorDevices = await dbHelper.getDevicesByFloor(selectedFloor);
+      deviceIds = floorDevices.map((d) => d.deviceId).toList();
+    } else {
+      // If no floor selected, get all devices with no floor
+      final noFloorDevices = await dbHelper.getDevicesByFloor(null);
+      deviceIds = noFloorDevices.map((d) => d.deviceId).toList();
+    }
+    
+    // Load sales for the selected floor
+    if (deviceIds.isNotEmpty) {
+      await dbHelper.getSalesByDeviceIdsAndDateRange(
+        deviceIds,
+        shiftStart,
+        shiftEnd,
+      );
+      if (!mounted) return;
+      context.read<SalesBloc>().add(LoadSalesByDateRange(
         startDate: shiftStart,
         endDate: shiftEnd,
-      ),
-    );
+      ));
+      // Wait a bit for the bloc to update
+      await Future.delayed(const Duration(milliseconds: 300));
+    } else {
+      if (!mounted) return;
+      context.read<SalesBloc>().add(
+        LoadSalesByDateRange(
+          startDate: shiftStart,
+          endDate: shiftEnd,
+        ),
+      );
+    }
 
+    if (!mounted) return;
     _showReportDialog(
       l10n.shiftClosingReport,
-      _buildDetailedSalesReport(l10n, reportDate: now),
+      _buildDetailedSalesReport(l10n, reportDate: now, selectedFloor: selectedFloor, deviceIds: deviceIds),
     );
   }
 
@@ -497,6 +614,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     Category? selectedCategory,
     Item? selectedItem,
     DateTime? reportDate,
+    int? selectedFloor,
+    List<String>? deviceIds,
   }) {
     // Calculate shift period for previous balance calculation
     final now = reportDate ?? DateTime.now();
@@ -526,8 +645,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             );
           }
 
-          // Filter sales based on category or item or date range
+          // Filter sales based on category or item or date range or floor
           List<Sale> filteredSales = salesState.sales;
+          
+          // If deviceIds is provided, filter by device IDs (for floor filtering)
+          if (deviceIds != null && deviceIds.isNotEmpty) {
+            filteredSales = filteredSales.where((sale) {
+              return sale.deviceId != null && deviceIds.contains(sale.deviceId);
+            }).toList();
+          }
           
           // If reportDate is provided, filter by date range (shift period)
           if (reportDate != null) {
@@ -675,16 +801,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final netCash = previousBalance + netMovementForDay;
 
           // Get itemized sales - only for items from selected category/item
-          final Map<String, int> itemizedSales = {};
-          final Map<String, double> itemizedPrices = {};
+          // Structure: itemName -> {quantity, price, total}
+          final Map<String, Map<String, dynamic>> itemizedSales = {};
           for (final sale in filteredSales) {
             for (final saleItem in sale.items) {
               // Filter by category or item
               if (relevantItemIds != null && !relevantItemIds.contains(saleItem.itemId)) {
                 continue;
               }
-              itemizedSales[saleItem.itemName] = (itemizedSales[saleItem.itemName] ?? 0) + saleItem.quantity;
-              itemizedPrices[saleItem.itemName] = saleItem.price;
+              if (itemizedSales.containsKey(saleItem.itemName)) {
+                itemizedSales[saleItem.itemName]!['quantity'] = 
+                    (itemizedSales[saleItem.itemName]!['quantity'] as int) + saleItem.quantity;
+                itemizedSales[saleItem.itemName]!['total'] = 
+                    (itemizedSales[saleItem.itemName]!['total'] as double) + saleItem.total;
+              } else {
+                itemizedSales[saleItem.itemName] = {
+                  'quantity': saleItem.quantity,
+                  'price': saleItem.price,
+                  'total': saleItem.total,
+                };
+              }
             }
           }
 
@@ -704,17 +840,35 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      selectedCategory != null 
-                          ? '${l10n.salesReportByCategory} - ${selectedCategory.name}'
-                          : selectedItem != null
-                              ? '${l10n.salesReportByItem} - ${selectedItem.name}'
-                              : reportDate != null
-                                  ? l10n.shiftClosingReport
-                                  : l10n.dailySalesReport,
-                      style: AppTextStyles.titleLarge.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          selectedCategory != null 
+                              ? '${l10n.salesReportByCategory} - ${selectedCategory.name}'
+                              : selectedItem != null
+                                  ? '${l10n.salesReportByItem} - ${selectedItem.name}'
+                                  : reportDate != null
+                                      ? l10n.shiftClosingReport
+                                      : l10n.dailySalesReport,
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (selectedFloor != null)
+                          Text(
+                            selectedFloor == 0
+                                ? l10n.groundFloor
+                                : selectedFloor == 1
+                                    ? l10n.secondFloor
+                                    : selectedFloor == 2
+                                        ? l10n.thirdFloor
+                                        : '${l10n.floor} $selectedFloor',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -770,7 +924,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 ),
                 const SizedBox(height: AppSpacing.md),
                 
-                // Itemized Sales
+                // Itemized Sales - Detailed view with quantity, price, and total
                 Text(
                   l10n.itemizedSales,
                   style: AppTextStyles.titleMedium.copyWith(
@@ -799,7 +953,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       Expanded(
                         flex: 2,
                         child: Text(
-                          l10n.value,
+                          l10n.quantity,
                           style: AppTextStyles.bodyMedium.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -807,9 +961,19 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         ),
                       ),
                       Expanded(
-                        flex: 1,
+                        flex: 2,
                         child: Text(
-                          l10n.quantity,
+                          l10n.price,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          l10n.value,
                           style: AppTextStyles.bodyMedium.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -823,6 +987,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 ...itemizedSales.entries.toList().asMap().entries.map((mapEntry) {
                   final index = mapEntry.key;
                   final entry = mapEntry.value;
+                  final itemData = entry.value;
+                  final quantity = itemData['quantity'] as int;
+                  final price = itemData['price'] as double;
+                  final total = itemData['total'] as double;
                   final isEven = index % 2 == 0;
                   final backgroundColor = isEven ? Colors.white : Colors.grey.shade100;
                   
@@ -851,16 +1019,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         Expanded(
                           flex: 2,
                           child: Text(
-                            CurrencyFormatter.format(itemizedPrices[entry.key] ?? 0.0),
+                            quantity.toString(),
                             style: AppTextStyles.bodyMedium,
                             textAlign: TextAlign.center,
                           ),
                         ),
                         Expanded(
-                          flex: 1,
+                          flex: 2,
                           child: Text(
-                            entry.value.toString(),
+                            CurrencyFormatter.format(price),
                             style: AppTextStyles.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            CurrencyFormatter.format(total),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -868,6 +1046,46 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     ),
                   );
                 }),
+                const SizedBox(height: AppSpacing.md),
+                // Grand Total
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    border: Border.all(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        l10n.grandTotals,
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        CurrencyFormatter.format(
+                          itemizedSales.values.fold<double>(
+                            0.0,
+                            (sum, itemData) {
+                              final data = itemData;
+                              return sum + (data['total'] as double);
+                            },
+                          ),
+                        ),
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
@@ -885,7 +1103,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         ),
                       ),
                       Text(
-                        itemizedSales.values.fold<int>(0, (sum, qty) => sum + qty).toString(),
+                        itemizedSales.values.fold<int>(
+                          0,
+                          (sum, itemData) {
+                            final data = itemData;
+                            return sum + (data['quantity'] as int);
+                          },
+                        ).toString(),
                         style: AppTextStyles.bodyMedium.copyWith(
                           fontWeight: FontWeight.bold,
                         ),

@@ -57,5 +57,10 @@ class DeviceLocalDataSource {
   Future<void> updateDeviceFloor(String deviceId, int? floor) async {
     await _dbHelper.updateDeviceFloor(deviceId, floor);
   }
+
+  /// Get devices by floor
+  Future<List<Device>> getDevicesByFloor(int? floor) async {
+    return await _dbHelper.getDevicesByFloor(floor);
+  }
 }
 

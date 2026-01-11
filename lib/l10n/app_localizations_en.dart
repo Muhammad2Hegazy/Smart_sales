@@ -1582,4 +1582,97 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get floorsUpdatedSuccessfully => 'Floors updated successfully';
+
+  @override
+  String get expiryDate => 'Expiry Date';
+
+  @override
+  String get editMaterial => 'Edit Material';
+
+  @override
+  String get addBatch => 'Add Batch';
+
+  @override
+  String get batchExpiryDate => 'Batch Expiry Date';
+
+  @override
+  String get materialQuantity => 'Material Quantity';
+
+  @override
+  String get materialUnit => 'Material Unit';
+
+  @override
+  String get pleaseEnterQuantity => 'Please enter quantity';
+
+  @override
+  String get pleaseSelectExpiryDate => 'Please select expiry date';
+
+  @override
+  String get batchAddedSuccessfully => 'Batch added successfully';
+
+  @override
+  String get batchUpdatedSuccessfully => 'Batch updated successfully';
+
+  @override
+  String get materialNameColumn => 'Material Name';
+
+  @override
+  String get quantityColumn => 'Quantity';
+
+  @override
+  String get expiryDateColumn => 'Expiry Date';
+
+  @override
+  String get recipe => 'Recipe';
+
+  @override
+  String get recipeManagement => 'Recipe Management';
+
+  @override
+  String get manageRecipe => 'Manage Recipe';
+
+  @override
+  String get recipeIngredients => 'Recipe Ingredients';
+
+  @override
+  String get addIngredient => 'Add Ingredient';
+
+  @override
+  String get selectRawMaterial => 'Select Raw Material';
+
+  @override
+  String get ingredientQuantity => 'Ingredient Quantity';
+
+  @override
+  String get pleaseSelectRawMaterial => 'Please select raw material';
+
+  @override
+  String get pleaseEnterIngredientQuantity => 'Please enter ingredient quantity';
+
+  @override
+  String get ingredientAddedSuccessfully => 'Ingredient added successfully';
+
+  @override
+  String get ingredientUpdatedSuccessfully => 'Ingredient updated successfully';
+
+  @override
+  String get ingredientDeletedSuccessfully => 'Ingredient deleted successfully';
+
+  @override
+  String get recipeCreatedSuccessfully => 'Recipe created successfully';
+
+  @override
+  String get recipeUpdatedSuccessfully => 'Recipe updated successfully';
+
+  @override
+  String get noRecipeFound => 'No recipe found for this product';
+
+  @override
+  String get createRecipe => 'Create Recipe';
+
+  @override
+  String get editIngredient => 'Edit Ingredient';
+
+  @override
+  String get deleteIngredient => 'Delete Ingredient';
 }
