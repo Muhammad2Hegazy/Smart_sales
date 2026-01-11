@@ -141,7 +141,6 @@ class ShiftCloseReport {
             }
             
             double netSales = totalSales - discount;
-            double vat = netSales * 0.14; // 14% VAT
             double visa = creditSales;
             
             // Calculate cost of sales (30% of total sales)
@@ -250,7 +249,6 @@ class ShiftCloseReport {
                       ReportWidgets.buildReportRow(l10n.netSales, CurrencyFormatter.format(netSales), isBold: true),
                       ReportWidgets.buildReportRow(l10n.dineInService, CurrencyFormatter.format(dineInService)),
                       ReportWidgets.buildReportRow(l10n.deliveryService, CurrencyFormatter.format(deliveryService)),
-                      ReportWidgets.buildReportRow(l10n.valueAddedTax, CurrencyFormatter.format(vat)),
                       ReportWidgets.buildReportRow(l10n.creditSales, CurrencyFormatter.format(creditSales)),
                       ReportWidgets.buildReportRow(l10n.visa, CurrencyFormatter.format(visa)),
                       ReportWidgets.buildReportRow(l10n.costOfSales, CurrencyFormatter.format(costOfSales)),
@@ -533,7 +531,6 @@ class ShiftCloseReport {
       }
       
       double netSales = totalSales - discount;
-      double vat = netSales * 0.14;
       double visa = creditSales;
       double costOfSales = totalSales * 0.3;
       double otherRevenues = 0.0;
@@ -605,7 +602,6 @@ class ShiftCloseReport {
         netSales: netSales,
         dineInService: dineInService,
         deliveryService: deliveryService,
-        vat: vat,
         creditSales: creditSales,
         visa: visa,
         costOfSales: costOfSales,
@@ -708,7 +704,6 @@ class ShiftCloseReport {
             }
             
             double netSales = totalSales - discount;
-            double vat = netSales * 0.14;
             double visa = creditSales;
             double costOfSales = totalSales * 0.3;
             double otherRevenues = 0.0;
@@ -806,7 +801,6 @@ class ShiftCloseReport {
                   ReportWidgets.buildReportRow(l10n.netSales, CurrencyFormatter.format(netSales), isBold: true),
                   ReportWidgets.buildReportRow(l10n.dineInService, CurrencyFormatter.format(dineInService)),
                   ReportWidgets.buildReportRow(l10n.deliveryService, CurrencyFormatter.format(deliveryService)),
-                  ReportWidgets.buildReportRow(l10n.valueAddedTax, CurrencyFormatter.format(vat)),
                   ReportWidgets.buildReportRow(l10n.creditSales, CurrencyFormatter.format(creditSales)),
                   ReportWidgets.buildReportRow(l10n.visa, CurrencyFormatter.format(visa)),
                   ReportWidgets.buildReportRow(l10n.costOfSales, CurrencyFormatter.format(costOfSales)),

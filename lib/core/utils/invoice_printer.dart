@@ -86,8 +86,6 @@ class InvoicePrinter {
     // We need to calculate subtotal from items
     final itemsSubtotal = items.fold(0.0, (sum, item) => sum + item.total);
     final subtotal = itemsSubtotal;
-    final taxRate = 0.14; // 14% VAT
-    final tax = subtotal * taxRate;
     final service = serviceCharge; // Use passed service charge
     final deliveryService = deliveryTax; // Use passed delivery tax
     // hospitalityTax is now part of discountAmount, not shown separately
@@ -289,10 +287,6 @@ class InvoicePrinter {
                     '${l10n?.totalDiscount ?? 'اجمالي الخصم'} (${CurrencyFormatter.formatDouble(discountPercentage, 1)}%)',
                     CurrencyFormatter.format(discount),
                   ),
-                _buildTotalRow(
-                  l10n?.valueAddedTax ?? 'ضريبة القيمة المضافة',
-                  CurrencyFormatter.format(tax),
-                ),
                         if (service > 0) // Only show service charge if > 0
                           _buildTotalRow(
                             l10n?.service ?? 'خدمة',
@@ -704,7 +698,6 @@ class InvoicePrinter {
     required double netSales,
     required double dineInService,
     required double deliveryService,
-    required double vat,
     required double creditSales,
     required double visa,
     required double costOfSales,
@@ -798,7 +791,6 @@ class InvoicePrinter {
               _buildReportRow(l10n?.netSales ?? 'صافي المبيعات', _formatCurrency(netSales), font, isBold: true),
               _buildReportRow(l10n?.dineInService ?? 'خدمه صاله', _formatCurrency(dineInService), font),
               _buildReportRow(l10n?.deliveryService ?? 'خدمه توصیل', _formatCurrency(deliveryService), font),
-              _buildReportRow(l10n?.valueAddedTax ?? 'ضريبه قيمه مضافه', _formatCurrency(vat), font),
               _buildReportRow(l10n?.creditSales ?? 'مبيعات وایرادات اجل', _formatCurrency(creditSales), font),
               _buildReportRow(l10n?.visa ?? 'فيزا', _formatCurrency(visa), font),
               _buildReportRow(l10n?.costOfSales ?? 'تكلفه المبيعات', _formatCurrency(costOfSales), font),

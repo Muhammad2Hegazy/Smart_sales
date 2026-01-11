@@ -646,14 +646,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showTaxSettings(BuildContext context, AppLocalizations l10n) async {
-    final currentVatRate = await TaxSettingsHelper.loadVatRate();
     final currentServiceChargeRate = await TaxSettingsHelper.loadServiceChargeRate();
     final currentDeliveryTaxRate = await TaxSettingsHelper.loadDeliveryTaxRate();
     final currentHospitalityTaxRate = await TaxSettingsHelper.loadHospitalityTaxRate();
     
-    final vatRateController = TextEditingController(
-      text: (currentVatRate * 100).toStringAsFixed(2),
-    );
     final serviceChargeController = TextEditingController(
       text: (currentServiceChargeRate * 100).toStringAsFixed(2),
     );
@@ -677,25 +673,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'VAT Rate (%)',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  controller: vatRateController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'VAT Rate (%)',
-                    hintText: '14.0',
-                    border: const OutlineInputBorder(),
-                    suffixText: '%',
-                  ),
-                  style: AppTextStyles.bodyMedium,
-                ),
-                const SizedBox(height: AppSpacing.md),
                 Text(
                   'Service Charge Rate (%)',
                   style: AppTextStyles.bodyMedium.copyWith(
@@ -770,20 +747,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             AppButton(
               label: l10n.save,
               onPressed: () async {
-                final vatRate = double.tryParse(vatRateController.text);
                 final serviceChargeRate = double.tryParse(serviceChargeController.text);
                 final deliveryTaxRate = double.tryParse(deliveryTaxController.text);
                 final hospitalityTaxRate = double.tryParse(hospitalityTaxController.text);
-                
-                if (vatRate == null || vatRate < 0 || vatRate > 100) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a valid VAT rate (0-100)'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                  return;
-                }
                 
                 if (serviceChargeRate == null || serviceChargeRate < 0 || serviceChargeRate > 100) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -815,7 +781,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   return;
                 }
                 
-                final saved = await TaxSettingsHelper.saveVatRate(vatRate / 100);
                 final savedService = await TaxSettingsHelper.saveServiceChargeRate(serviceChargeRate / 100);
                 final savedDelivery = await TaxSettingsHelper.saveDeliveryTaxRate(deliveryTaxRate / 100);
                 final savedHospitality = await TaxSettingsHelper.saveHospitalityTaxRate(hospitalityTaxRate / 100);
@@ -824,10 +789,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(saved && savedService && savedDelivery && savedHospitality
+                      content: Text(savedService && savedDelivery && savedHospitality
                           ? l10n.settingsSavedSuccessfully
                           : l10n.failedToSaveSettings),
-                      backgroundColor: saved && savedService && savedDelivery && savedHospitality ? AppColors.secondary : AppColors.error,
+                      backgroundColor: savedService && savedDelivery && savedHospitality ? AppColors.secondary : AppColors.error,
                     ),
                   );
                 }

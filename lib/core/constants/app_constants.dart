@@ -9,7 +9,6 @@ class AppConstants {
   
   // Default Values
   static const int lowStockThreshold = 30;
-  static const double defaultTaxRate = 0.14; // 14% VAT in Egypt
   
   // Locale
   static const String defaultLocale = 'ar';
