@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/sale.dart';
 import '../models/cart_item.dart';
 import '../models/financial_transaction.dart';
+import '../models/low_stock_warning.dart';
 import '../database/database_helper.dart';
 import '../../bloc/sales/sales_bloc.dart';
 import '../../bloc/sales/sales_event.dart';
@@ -22,7 +23,8 @@ class PaymentService {
         _financialBloc = financialBloc;
 
   /// Process payment and save sale to database
-  Future<Sale> processPayment({
+  /// Returns sale and list of low stock warnings
+  Future<({Sale sale, List<LowStockWarning> warnings})> processPayment({
     required List<CartItem> items,
     required double total,
     String? tableNumber,
@@ -71,7 +73,8 @@ class PaymentService {
     // Save sale to database via BLoC (for state management)
     _salesBloc.add(AddSale(sale));
     
-    // Deduct inventory for each item in the sale
+    // Deduct inventory for each item in the sale and collect warnings
+    final lowStockWarnings = <LowStockWarning>[];
     try {
       debugPrint('═══════════════════════════════════════════════════════');
       debugPrint('Starting inventory deduction for sale ${sale.id}');
@@ -98,14 +101,21 @@ class PaymentService {
         
         debugPrint('  ✓ Recipe found with ${recipe.ingredients.length} ingredient(s)');
         
-        // Deduct inventory
-        await dbHelper.deductInventoryForSale(saleItem.itemId, saleItem.quantity);
+        // Deduct inventory and get warnings
+        final warnings = await dbHelper.deductInventoryForSale(saleItem.itemId, saleItem.quantity);
+        lowStockWarnings.addAll(warnings);
         debugPrint('  ✓ Inventory deduction completed for ${saleItem.itemName}');
+        if (warnings.isNotEmpty) {
+          debugPrint('  ⚠️  ${warnings.length} low stock warning(s) generated');
+        }
       }
       
       debugPrint('');
       debugPrint('═══════════════════════════════════════════════════════');
       debugPrint('Inventory deduction process completed for sale ${sale.id}');
+      if (lowStockWarnings.isNotEmpty) {
+        debugPrint('⚠️  ${lowStockWarnings.length} low stock warning(s) detected');
+      }
       debugPrint('═══════════════════════════════════════════════════════');
     } catch (e, stackTrace) {
       // Log error but don't fail the sale - inventory deduction is important but shouldn't block sales
@@ -113,6 +123,9 @@ class PaymentService {
       debugPrint('❌ ERROR deducting inventory for sale ${sale.id}: $e');
       debugPrint('Stack trace: $stackTrace');
     }
+    
+    // Store warnings in sale object for later retrieval (we'll add a warnings field or return them separately)
+    // For now, we'll return them via a callback or store them
     
     // Record financial transaction (cash in)
     final transaction = FinancialTransaction(
@@ -124,7 +137,7 @@ class PaymentService {
     );
     _financialBloc.add(AddFinancialTransaction(transaction));
     
-    return sale;
+    return (sale: sale, warnings: lowStockWarnings);
   }
 }
 

@@ -89,6 +89,8 @@ class PermissionService {
     switch (menuItem) {
       case 'pos':
         return PermissionKeys.accessPosScreen;
+      case 'purchaseInvoice':
+        return PermissionKeys.accessPosScreen; // Use same permission as POS for now
       case 'items':
         return PermissionKeys.accessItemsScreen;
       case 'inventory':
@@ -106,7 +108,7 @@ class PermissionService {
 
   /// Get all accessible menu items for current user
   Future<List<String>> getAccessibleMenuItems() async {
-    final allItems = ['pos', 'items', 'inventory', 'reports', 'profitLoss', 'settings'];
+    final allItems = ['pos', 'purchaseInvoice', 'items', 'inventory', 'reports', 'profitLoss', 'settings'];
     final accessibleItems = <String>[];
 
     for (final item in allItems) {

@@ -161,7 +161,7 @@ class SaleItem {
       itemId: map['item_id'] as String,
       itemName: map['item_name'] as String,
       price: (map['price'] as num).toDouble(),
-      quantity: map['quantity'] as int,
+      quantity: (map['quantity'] as num).toInt(),
       total: (map['total'] as num).toDouble(),
     );
   }

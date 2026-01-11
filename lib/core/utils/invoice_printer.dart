@@ -43,6 +43,21 @@ class InvoicePrinter {
       marginAll: 4 * PdfPageFormat.mm,
     );
   }
+
+  /// Get full page format for reports (minimal margins)
+  static Future<PdfPageFormat> _getFullPageFormat() async {
+    final settings = await PrinterSettingsHelper.loadSettings();
+    final width = settings.width * PdfPageFormat.mm;
+    final height = settings.height == double.infinity 
+        ? double.infinity 
+        : settings.height * PdfPageFormat.mm;
+    
+    return PdfPageFormat(
+      width,
+      height,
+      marginAll: 2 * PdfPageFormat.mm, // Minimal margins for full page
+    );
+  }
   
   static Future<void> printCustomerInvoice({
     required List<CartItem> items,
@@ -677,6 +692,376 @@ class InvoicePrinter {
         throw Exception('Failed to print: $e');
       }
     }
+  }
+
+  /// Print shift close report
+  static Future<void> printShiftCloseReport({
+    required String title,
+    required DateTime reportDate,
+    String? floorName,
+    required double totalSales,
+    required double discount,
+    required double netSales,
+    required double dineInService,
+    required double deliveryService,
+    required double vat,
+    required double creditSales,
+    required double visa,
+    required double costOfSales,
+    required double cashSales,
+    required double otherRevenues,
+    required double totalReceipts,
+    required double expensesAndPurchases,
+    required double suppliesToSubTreasury,
+    required double totalPayments,
+    required double netMovementForDay,
+    required double previousBalance,
+    required double netCash,
+    required Map<String, Map<String, dynamic>> itemizedSales,
+    required int totalCount,
+    AppLocalizations? l10n,
+  }) async {
+    final pdf = pw.Document();
+    final font = await _getArabicFont();
+    
+    // Business info
+    const businessName = 'Queen Café';
+    
+    // Get full page format for reports
+    final pageFormat = await _getFullPageFormat();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: pageFormat,
+        build: (pw.Context context) {
+          return pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              mainAxisSize: pw.MainAxisSize.max,
+              children: [
+                // Header
+                pw.Center(
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        businessName,
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          font: font,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                      pw.SizedBox(height: 8),
+                      pw.Text(
+                        title,
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          font: font,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        '${_formatDate(reportDate)} ${_formatTime(reportDate)}',
+                        style: pw.TextStyle(fontSize: 10, font: font),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                      if (floorName != null) ...[
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          floorName,
+                          style: pw.TextStyle(fontSize: 10, font: font),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                pw.Divider(),
+                pw.SizedBox(height: 8),
+                
+                // Sales Section
+                pw.Text(
+                  l10n?.totalSales ?? 'المبيعات',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    font: font,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              pw.SizedBox(height: 4),
+              _buildReportRow(l10n?.totalSales ?? 'اجمالي المبيعات', _formatCurrency(totalSales), font),
+              _buildReportRow(l10n?.discount ?? 'خصم', _formatCurrency(discount), font),
+              _buildReportRow(l10n?.netSales ?? 'صافي المبيعات', _formatCurrency(netSales), font, isBold: true),
+              _buildReportRow(l10n?.dineInService ?? 'خدمه صاله', _formatCurrency(dineInService), font),
+              _buildReportRow(l10n?.deliveryService ?? 'خدمه توصیل', _formatCurrency(deliveryService), font),
+              _buildReportRow(l10n?.valueAddedTax ?? 'ضريبه قيمه مضافه', _formatCurrency(vat), font),
+              _buildReportRow(l10n?.creditSales ?? 'مبيعات وایرادات اجل', _formatCurrency(creditSales), font),
+              _buildReportRow(l10n?.visa ?? 'فيزا', _formatCurrency(visa), font),
+              _buildReportRow(l10n?.costOfSales ?? 'تكلفه المبيعات', _formatCurrency(costOfSales), font),
+              pw.SizedBox(height: 8),
+              
+              // Receipts Section
+              pw.Text(
+                l10n?.totalReceipts ?? 'المقبوضات',
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  font: font,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              _buildReportRow(l10n?.cashSales ?? 'مبيعات نقدی', _formatCurrency(cashSales), font),
+              _buildReportRow(l10n?.otherRevenues ?? 'ایرادات اخرى', _formatCurrency(otherRevenues), font),
+              _buildReportRow(l10n?.totalReceipts ?? 'اجمالي المقبوضات', _formatCurrency(totalReceipts), font, isBold: true),
+              pw.SizedBox(height: 8),
+              
+              // Payments Section
+              pw.Text(
+                l10n?.totalPayments ?? 'المدفوعات',
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  font: font,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              _buildReportRow(l10n?.expensesAndPurchases ?? 'مصروفات ومشتريات', _formatCurrency(expensesAndPurchases), font),
+              _buildReportRow(l10n?.suppliesToSubTreasury ?? 'توريدات للخزينة الفرعيه', _formatCurrency(suppliesToSubTreasury), font),
+              _buildReportRow(l10n?.totalPayments ?? 'اجمالي المدفوعات', _formatCurrency(totalPayments), font, isBold: true),
+              pw.SizedBox(height: 8),
+              
+              // Summary Section
+              _buildReportRow(l10n?.netMovementForDay ?? 'صافي حركة اليوم', _formatCurrency(netMovementForDay), font),
+              _buildReportRow(l10n?.previousBalance ?? 'الرصيد السابق', _formatCurrency(previousBalance), font),
+              _buildReportRow(l10n?.netCash ?? 'صافي النقدية', _formatCurrency(netCash), font, isBold: true),
+              pw.SizedBox(height: 8),
+              
+              // Itemized Sales
+              pw.Text(
+                l10n?.itemizedSales ?? 'الأصناف المباعة',
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  font: font,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              // Table header
+              pw.Row(
+                children: [
+                  pw.Expanded(
+                    flex: 3,
+                    child: pw.Text(
+                      l10n?.item ?? 'الصنف',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        font: font,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  pw.Expanded(
+                    flex: 2,
+                    child: pw.Text(
+                      l10n?.quantity ?? 'الكمية',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        font: font,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                  pw.Expanded(
+                    flex: 2,
+                    child: pw.Text(
+                      l10n?.value ?? 'القيمة',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        font: font,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+              pw.Divider(),
+              // Table rows
+              ...itemizedSales.entries.map((entry) {
+                final itemData = entry.value;
+                final quantity = itemData['quantity'] as int;
+                final total = itemData['total'] as double;
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                  child: pw.Row(
+                    children: [
+                      pw.Expanded(
+                        flex: 3,
+                        child: pw.Text(
+                          entry.key,
+                          style: pw.TextStyle(fontSize: 9, font: font),
+                        ),
+                      ),
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(
+                          quantity.toString(),
+                          style: pw.TextStyle(fontSize: 9, font: font),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ),
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(
+                          _formatCurrency(total),
+                          style: pw.TextStyle(fontSize: 9, font: font),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              pw.SizedBox(height: 8),
+              pw.Divider(),
+              
+              // Total Count
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    l10n?.totalCount ?? 'اجمالي العدد',
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      font: font,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    totalCount.toString(),
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      font: font,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            ),
+          );
+        },
+      ),
+    );
+    
+    final pdfBytes = await pdf.save();
+    
+    // Load printer settings
+    final settings = await PrinterSettingsHelper.loadSettings();
+    
+    // Get available printers
+    final printers = await Printing.listPrinters();
+    if (printers.isEmpty) {
+      debugPrint('No printers available');
+      throw Exception('No printers available. Please connect a printer.');
+    }
+    
+    // Try to find printer matching saved name, or use default printer
+    Printer? printer;
+    if (settings.printerName.isNotEmpty) {
+      try {
+        printer = printers.firstWhere(
+          (p) => p.name == settings.printerName,
+        );
+        debugPrint('Using saved printer: ${printer.name}');
+      } catch (e) {
+        printer = printers.firstWhere(
+          (p) => p.isDefault,
+          orElse: () => printers.first,
+        );
+        debugPrint('Saved printer "${settings.printerName}" not found, using: ${printer.name}');
+      }
+    } else {
+      printer = printers.firstWhere(
+        (p) => p.isDefault,
+        orElse: () => printers.first,
+      );
+      debugPrint('Using printer: ${printer.name}');
+    }
+    
+    // Print directly
+    try {
+      await Printing.directPrintPdf(
+        printer: printer,
+        onLayout: (PdfPageFormat format) async => pdfBytes,
+      );
+      debugPrint('Report printed successfully to printer: ${printer.name}');
+    } catch (e, stackTrace) {
+      debugPrint('Direct print failed: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // Fallback to dialog
+      try {
+        await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdfBytes,
+        );
+        debugPrint('Print dialog opened as fallback');
+      } catch (e2) {
+        debugPrint('Alternative print method also failed: $e2');
+        throw Exception('Failed to print: $e');
+      }
+    }
+  }
+
+  static pw.Widget _buildReportRow(String label, String value, pw.Font font, {bool isBold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          // In RTL context, value should be on the left, label on the right
+          // So we reverse the order to match RTL layout
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 9,
+              font: font,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+            textAlign: pw.TextAlign.left,
+          ),
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 9,
+              font: font,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+            textAlign: pw.TextAlign.right,
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  static String _formatTime(DateTime date) {
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+    final hour12 = (date.hour % 12 == 0 ? 12 : date.hour % 12).toString().padLeft(2, '0');
+    return '$hour12:$minute $period';
+  }
+
+  static String _formatCurrency(double amount) {
+    return CurrencyFormatter.format(amount);
   }
 }
 

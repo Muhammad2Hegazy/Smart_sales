@@ -11,11 +11,12 @@ import '../core/constants/app_constants.dart';
 import '../bloc/navigation/navigation_bloc.dart';
 import '../bloc/navigation/navigation_event.dart';
 import '../bloc/navigation/navigation_state.dart';
-import 'pos_screen.dart';
+import 'invoices_tabs.dart';
+import 'purchase_invoice_screen.dart';
 import 'inventory_screen.dart';
 import 'items_screen.dart';
 import 'settings_screen.dart';
-import 'reports_screen.dart';
+import 'reports/reports_tabs.dart';
 import 'financial_screen.dart';
 import '../bloc/sales/sales_bloc.dart';
 import '../bloc/sales/sales_event.dart';
@@ -73,7 +74,7 @@ class _MainScreenState extends State<MainScreen> {
             onTimeout: () {
               debugPrint('Permission loading timeout - using all menu items');
               // Return all items as fallback if timeout
-              return ['pos', 'items', 'inventory', 'reports', 'profitLoss', 'settings'];
+              return ['pos', 'purchaseInvoice', 'items', 'inventory', 'reports', 'profitLoss', 'settings'];
             },
           );
       
@@ -91,6 +92,9 @@ class _MainScreenState extends State<MainScreen> {
             switch (accessibleItems.first) {
               case 'pos':
                 firstAccessibleItem = MenuItem.pos;
+                break;
+              case 'purchaseInvoice':
+                firstAccessibleItem = MenuItem.purchaseInvoice;
                 break;
               case 'items':
                 firstAccessibleItem = MenuItem.items;
@@ -121,7 +125,7 @@ class _MainScreenState extends State<MainScreen> {
       // On error, allow access to all items
       if (mounted) {
         setState(() {
-          _accessibleMenuItems = ['pos', 'items', 'inventory', 'reports', 'profitLoss', 'settings'];
+          _accessibleMenuItems = ['pos', 'purchaseInvoice', 'items', 'inventory', 'reports', 'profitLoss', 'settings'];
           _isLoadingPermissions = false;
         });
       }
@@ -148,6 +152,9 @@ class _MainScreenState extends State<MainScreen> {
               switch (_accessibleMenuItems.first) {
                 case 'pos':
                   firstAccessibleItem = MenuItem.pos;
+                  break;
+                case 'purchaseInvoice':
+                  firstAccessibleItem = MenuItem.purchaseInvoice;
                   break;
                 case 'items':
                   firstAccessibleItem = MenuItem.items;
@@ -320,17 +327,34 @@ class _MainScreenState extends State<MainScreen> {
   List<Widget> _buildMenuItems(BuildContext context, MenuItem selectedItem, AppLocalizations l10n) {
     final menuItems = <Widget>[];
     
-    // POS
+    // Sales Invoice (formerly POS)
     if (_accessibleMenuItems.contains('pos')) {
       menuItems.add(
         _buildMenuItem(
           context,
           icon: Icons.shopping_cart_outlined,
-          title: l10n.pos,
+          title: l10n.salesInvoice,
           selected: selectedItem == MenuItem.pos,
           onTap: () {
             context.read<NavigationBloc>().add(
               NavigateToMenuItem(MenuItem.pos),
+            );
+          },
+        ),
+      );
+    }
+    
+    // Purchase Invoice
+    if (_accessibleMenuItems.contains('purchaseInvoice')) {
+      menuItems.add(
+        _buildMenuItem(
+          context,
+          icon: Icons.shopping_bag_outlined,
+          title: 'فاتورة المشتريات',
+          selected: selectedItem == MenuItem.purchaseInvoice,
+          onTap: () {
+            context.read<NavigationBloc>().add(
+              NavigateToMenuItem(MenuItem.purchaseInvoice),
             );
           },
         ),
@@ -490,16 +514,15 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildContent(MenuItem selectedItem) {
     switch (selectedItem) {
       case MenuItem.pos:
+        return const InvoicesTabs();
+      case MenuItem.purchaseInvoice:
         return MultiBlocProvider(
           providers: [
-            BlocProvider<SalesBloc>(
-              create: (context) => SalesBloc()..add(const LoadSales()),
-            ),
             BlocProvider<FinancialBloc>(
               create: (context) => FinancialBloc()..add(const LoadFinancialTransactions()),
             ),
           ],
-          child: const POSScreen(),
+          child: const PurchaseInvoiceScreen(),
         );
       case MenuItem.inventory:
         return const InventoryScreen();
@@ -518,7 +541,7 @@ class _MainScreenState extends State<MainScreen> {
               create: (context) => FinancialBloc()..add(const LoadFinancialTransactions()),
             ),
           ],
-          child: const ReportsScreen(),
+          child: const ReportsTabs(),
         );
       case MenuItem.profitLoss:
         return MultiBlocProvider(

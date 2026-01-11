@@ -906,6 +906,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   DropdownButtonFormField<String>(
                     // ignore: deprecated_member_use
                     value: selectedPrinterName,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: l10n.printerName,
                       border: const OutlineInputBorder(),
@@ -1685,6 +1686,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     DropdownButtonFormField<String>(
                       // ignore: deprecated_member_use
                       value: selectedRole,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         labelText: l10n.role,
                         border: OutlineInputBorder(),
@@ -2393,6 +2395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 child: DropdownButtonFormField<int?>(
                                   // ignore: deprecated_member_use
                                   value: deviceFloors[device.deviceId] ?? device.floor,
+                                  isExpanded: true,
                                   decoration: InputDecoration(
                                     labelText: l10n.floor,
                                     border: const OutlineInputBorder(),

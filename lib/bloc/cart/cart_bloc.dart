@@ -9,6 +9,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     on<RemoveItemFromCart>(_onRemoveItemFromCart);
     on<UpdateItemQuantity>(_onUpdateItemQuantity);
     on<ClearCart>(_onClearCart);
+    on<SetOrderNumber>(_onSetOrderNumber);
   }
 
   void _onAddItemToCart(AddItemToCart event, Emitter<CartState> emit) {
@@ -64,6 +65,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
   void _onClearCart(ClearCart event, Emitter<CartState> emit) {
     emit(const CartState());
+  }
+
+  void _onSetOrderNumber(SetOrderNumber event, Emitter<CartState> emit) {
+    emit(state.copyWith(orderNumber: event.orderNumber));
   }
 }
 

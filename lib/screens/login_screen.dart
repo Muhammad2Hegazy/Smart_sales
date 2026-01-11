@@ -197,6 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   key: ValueKey('user_dropdown_${_users.length}'),
                                   // ignore: deprecated_member_use
                                   value: _selectedUser,
+                                  isExpanded: true,
                                   decoration: InputDecoration(
                                     labelText: l10n.selectUser,
                                     hintText: l10n.chooseUser,
@@ -503,6 +504,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   DropdownButtonFormField<UserProfile>(
                     // ignore: deprecated_member_use
                     value: selectedUserForReset,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: l10n.selectUser,
                       prefixIcon: const Icon(Icons.person_outline),

@@ -6,6 +6,7 @@ import '../core/theme/app_text_styles.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/models/cart_item.dart';
 import '../core/models/item.dart';
+import '../core/models/low_stock_warning.dart';
 import '../core/utils/invoice_printer.dart';
 import '../bloc/cart/cart_bloc.dart';
 import '../bloc/cart/cart_event.dart';
@@ -29,15 +30,8 @@ class POSScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(l10n.pointOfSale),
-      ),
-      body: const _POSContent(),
-    );
+    // No AppBar here - it's handled by InvoicesTabs
+    return const _POSContent();
   }
 }
 
@@ -75,7 +69,7 @@ class _POSContentState extends State<_POSContent> {
             // Table Selection Menu
             POSTableMenu(
               selectedTableNumber: _selectedTableNumber,
-              onTableSelected: (value) {
+              onTableSelected: (value) async {
                 setState(() {
                   // If table is deselected or changed, clear all selections
                   if (_selectedTableNumber != value) {
@@ -88,6 +82,13 @@ class _POSContentState extends State<_POSContent> {
                   }
                   _selectedTableNumber = value;
                 });
+                
+                // Generate order number when a new table is selected
+                if (value != null) {
+                  final dbHelper = DatabaseHelper();
+                  final nextOrderNumber = await dbHelper.getNextOrderNumber();
+                  context.read<CartBloc>().add(SetOrderNumber(nextOrderNumber));
+                }
               },
             ),
             // Categories Menu (only if table is selected)
@@ -317,11 +318,12 @@ class _POSContentState extends State<_POSContent> {
       // Total discount includes both manual discount and hospitality discount
       final totalDiscountAmount = discountAmount + hospitalityDiscount;
       
-      // Get next order and invoice numbers
+      // Use current order number from cart, or generate new one if not set
       final dbHelper = DatabaseHelper();
-      final nextOrderNumber = await dbHelper.getNextOrderNumber();
-      final nextInvoiceNumber = await dbHelper.getNextInvoiceNumber();
-      debugPrint('_printCustomerInvoice: Using orderNumber=$nextOrderNumber, invoiceNumber=$nextInvoiceNumber');
+      final orderNumber = cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
+      // Invoice number equals order number
+      final invoiceNumber = orderNumber;
+      debugPrint('_printCustomerInvoice: Using orderNumber=$orderNumber, invoiceNumber=$invoiceNumber');
       
       await InvoicePrinter.printCustomerInvoice(
         items: cartState.items,
@@ -332,8 +334,8 @@ class _POSContentState extends State<_POSContent> {
         deliveryTax: deliveryTax,
         hospitalityTax: hospitalityDiscount, // Store as discount amount (using hospitalityTax field for backward compatibility)
         tableNumber: _selectedTableNumber,
-        orderNumber: nextOrderNumber.toString(),
-        invoiceNumber: nextInvoiceNumber.toString(),
+        orderNumber: orderNumber.toString(),
+        invoiceNumber: invoiceNumber.toString(),
         l10n: l10n,
       );
       
@@ -379,15 +381,15 @@ class _POSContentState extends State<_POSContent> {
         );
       }
       
-      // Get next order number
+      // Use current order number from cart, or generate new one if not set
       final dbHelper = DatabaseHelper();
-      final nextOrderNumber = await dbHelper.getNextOrderNumber();
-      debugPrint('_printKitchenInvoice: Using orderNumber=$nextOrderNumber');
+      final orderNumber = cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
+      debugPrint('_printKitchenInvoice: Using orderNumber=$orderNumber');
       
       await InvoicePrinter.printKitchenInvoice(
         items: cartState.items,
         tableNumber: _selectedTableNumber,
-        orderNumber: nextOrderNumber.toString(),
+        orderNumber: orderNumber.toString(),
         l10n: l10n,
       );
       
@@ -488,7 +490,7 @@ class _POSContentState extends State<_POSContent> {
       final finalTotalWithCharges = finalTotal + serviceCharge + deliveryTax;
       
       // Save sale to database (this will be saved to reports)
-      await paymentService.processPayment(
+      final result = await paymentService.processPayment(
         items: cartState.items,
         total: finalTotalWithCharges,
         tableNumber: _selectedTableNumber,
@@ -501,14 +503,20 @@ class _POSContentState extends State<_POSContent> {
         l10n: l10n,
       );
       
+      // Show low stock warnings if any
+      if (result.warnings.isNotEmpty && context.mounted) {
+        _showLowStockWarnings(context, result.warnings);
+      }
+      
+      // Use current order number from cart, or generate new one if not set
+      final dbHelper = DatabaseHelper();
+      final orderNumber = cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
+      // Invoice number equals order number
+      final invoiceNumber = orderNumber;
+      debugPrint('_completePayment: Using orderNumber=$orderNumber, invoiceNumber=$invoiceNumber');
+      
       // Wait a bit to ensure database save is complete
       await Future.delayed(const Duration(milliseconds: 500));
-      
-      // Get next order and invoice numbers AFTER saving (so we count this sale too)
-      final dbHelper = DatabaseHelper();
-      final nextOrderNumber = await dbHelper.getNextOrderNumber();
-      final nextInvoiceNumber = await dbHelper.getNextInvoiceNumber();
-      debugPrint('_completePayment: Using orderNumber=$nextOrderNumber, invoiceNumber=$nextInvoiceNumber');
       
       // Auto-print customer invoice if printing is enabled
       if (_allowPrinting) {
@@ -523,8 +531,8 @@ class _POSContentState extends State<_POSContent> {
             deliveryTax: deliveryTax,
             hospitalityTax: hospitalityDiscount, // Store as discount amount (using hospitalityTax field for backward compatibility)
             tableNumber: _selectedTableNumber,
-            orderNumber: nextOrderNumber.toString(),
-            invoiceNumber: nextInvoiceNumber.toString(),
+            orderNumber: orderNumber.toString(),
+            invoiceNumber: invoiceNumber.toString(),
             l10n: l10n,
           );
         } catch (e) {
@@ -548,6 +556,12 @@ class _POSContentState extends State<_POSContent> {
         context.read<CartBloc>().add(const ClearCart());
       }
       
+      // Generate new order number for next order (after payment)
+      final nextOrderNumber = await dbHelper.getNextOrderNumber();
+      if (context.mounted && _selectedTableNumber != null) {
+        context.read<CartBloc>().add(SetOrderNumber(nextOrderNumber));
+      }
+      
       // Reset all selections for new customer
       setState(() {
         _selectedCategoryId = null;
@@ -557,7 +571,7 @@ class _POSContentState extends State<_POSContent> {
         _discountPercentage = 0.0;
       });
 
-      // Show success message
+      // Show success message (warnings are shown separately)
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -605,5 +619,118 @@ class _POSContentState extends State<_POSContent> {
         ),
       ),
     );
+  }
+
+  void _showLowStockWarnings(BuildContext context, List<LowStockWarning> warnings) {
+    // Separate critical and warning messages
+    final criticalWarnings = warnings.where((w) => w.isCritical).toList();
+    final regularWarnings = warnings.where((w) => !w.isCritical).toList();
+    
+    // Show critical warnings first in a dialog
+    if (criticalWarnings.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning, color: AppColors.error, size: 28),
+              const SizedBox(width: AppSpacing.md),
+              const Text('تحذير: المخزون منخفض جداً'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'المخزون التالي منخفض جداً أو نفد:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ...criticalWarnings.map((warning) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error, color: AppColors.error, size: 20),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          warning.message,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+                if (regularWarnings.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const Divider(),
+                  const SizedBox(height: AppSpacing.md),
+                  const Text(
+                    'تحذيرات أخرى:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ...regularWarnings.map((warning) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            warning.message,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('موافق'),
+            ),
+          ],
+        ),
+      );
+    } else if (regularWarnings.isNotEmpty) {
+      // Show regular warnings in a snackbar
+      final warningMessages = regularWarnings.map((w) => w.message).join('\n');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.white),
+                  SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'تحذير: المخزون منخفض',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(warningMessages),
+            ],
+          ),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'إغلاق',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
   }
 }

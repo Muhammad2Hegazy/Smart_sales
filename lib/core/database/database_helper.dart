@@ -21,6 +21,11 @@ import '../models/raw_material.dart';
 import '../models/raw_material_batch.dart';
 import '../models/recipe.dart';
 import '../models/recipe_ingredient.dart';
+import '../models/low_stock_warning.dart';
+import '../models/shift_report.dart';
+import '../models/inventory_movement.dart';
+import '../models/supplier.dart';
+import '../models/purchase.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -55,7 +60,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       dbPath,
-      version: 18, // Incremented for recipes and recipe ingredients
+      version: 20, // Incremented for purchase invoice enhancements (invoice_number, payment_type, supplier_invoice_number, discount per item)
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -359,6 +364,134 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX idx_user_profiles_role ON user_profiles(role)');
     await db.execute('CREATE INDEX idx_user_permissions_user_id ON user_permissions(user_id)');
     await db.execute('CREATE INDEX idx_user_permissions_key ON user_permissions(permission_key)');
+
+    // Shift reports table - stores shift closing reports
+    await db.execute('''
+      CREATE TABLE shift_reports (
+        id TEXT PRIMARY KEY,
+        shift_id TEXT NOT NULL,
+        shift_start TEXT NOT NULL,
+        shift_end TEXT NOT NULL,
+        floor_id INTEGER,
+        device_id TEXT,
+        total_sales REAL NOT NULL DEFAULT 0.0,
+        cash_total REAL NOT NULL DEFAULT 0.0,
+        visa_total REAL NOT NULL DEFAULT 0.0,
+        orders_count INTEGER NOT NULL DEFAULT 0,
+        discounts REAL NOT NULL DEFAULT 0.0,
+        service REAL NOT NULL DEFAULT 0.0,
+        tax REAL NOT NULL DEFAULT 0.0,
+        created_at TEXT NOT NULL,
+        master_device_id TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Inventory movements table - tracks all inventory changes
+    await db.execute('''
+      CREATE TABLE inventory_movements (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL,
+        movement_type TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price REAL,
+        total_value REAL,
+        reference_id TEXT,
+        reference_type TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        master_device_id TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+        FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Suppliers table - stores supplier/vendor information
+    await db.execute('''
+      CREATE TABLE suppliers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        contact_person TEXT,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        balance REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        master_device_id TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Purchases table - stores purchase invoices
+    await db.execute('''
+      CREATE TABLE purchases (
+        id TEXT PRIMARY KEY,
+        invoice_number TEXT NOT NULL,
+        supplier_id TEXT NOT NULL,
+        supplier_invoice_number TEXT,
+        purchase_date TEXT NOT NULL,
+        payment_type TEXT NOT NULL DEFAULT 'cash',
+        total_amount REAL NOT NULL,
+        paid_amount REAL NOT NULL DEFAULT 0.0,
+        discount_amount REAL,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        master_device_id TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+        FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Purchase items table - stores items in purchase invoices
+    await db.execute('''
+      CREATE TABLE purchase_items (
+        id TEXT PRIMARY KEY,
+        purchase_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'number',
+        quantity REAL NOT NULL,
+        unit_price REAL NOT NULL,
+        discount REAL NOT NULL DEFAULT 0.0,
+        total REAL NOT NULL,
+        master_device_id TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+        FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+        FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Create indexes for reports tables
+    await db.execute('CREATE INDEX idx_shift_reports_shift_id ON shift_reports(shift_id)');
+    await db.execute('CREATE INDEX idx_shift_reports_floor_id ON shift_reports(floor_id)');
+    await db.execute('CREATE INDEX idx_shift_reports_shift_start ON shift_reports(shift_start)');
+    await db.execute('CREATE INDEX idx_shift_reports_master_device_id ON shift_reports(master_device_id)');
+    await db.execute('CREATE INDEX idx_shift_reports_sync_status ON shift_reports(sync_status)');
+    
+    await db.execute('CREATE INDEX idx_inventory_movements_item_id ON inventory_movements(item_id)');
+    await db.execute('CREATE INDEX idx_inventory_movements_movement_type ON inventory_movements(movement_type)');
+    await db.execute('CREATE INDEX idx_inventory_movements_created_at ON inventory_movements(created_at)');
+    await db.execute('CREATE INDEX idx_inventory_movements_reference_id ON inventory_movements(reference_id)');
+    await db.execute('CREATE INDEX idx_inventory_movements_master_device_id ON inventory_movements(master_device_id)');
+    
+    await db.execute('CREATE INDEX idx_suppliers_master_device_id ON suppliers(master_device_id)');
+    await db.execute('CREATE INDEX idx_suppliers_sync_status ON suppliers(sync_status)');
+    
+    await db.execute('CREATE INDEX idx_purchases_supplier_id ON purchases(supplier_id)');
+    await db.execute('CREATE INDEX idx_purchases_purchase_date ON purchases(purchase_date)');
+    await db.execute('CREATE INDEX idx_purchases_master_device_id ON purchases(master_device_id)');
+    await db.execute('CREATE INDEX idx_purchase_items_purchase_id ON purchase_items(purchase_id)');
+    await db.execute('CREATE INDEX idx_purchase_items_item_id ON purchase_items(item_id)');
     
     // Create default admin user
     await _createDefaultAdminUser(db);
@@ -563,6 +696,183 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_recipes_item_id ON recipes(item_id)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_raw_material_id ON recipe_ingredients(raw_material_id)');
+    }
+    
+    if (oldVersion < 19) {
+      // Add reports tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shift_reports (
+          id TEXT PRIMARY KEY,
+          shift_id TEXT NOT NULL,
+          shift_start TEXT NOT NULL,
+          shift_end TEXT NOT NULL,
+          floor_id INTEGER,
+          device_id TEXT,
+          total_sales REAL NOT NULL DEFAULT 0.0,
+          cash_total REAL NOT NULL DEFAULT 0.0,
+          visa_total REAL NOT NULL DEFAULT 0.0,
+          orders_count INTEGER NOT NULL DEFAULT 0,
+          discounts REAL NOT NULL DEFAULT 0.0,
+          service REAL NOT NULL DEFAULT 0.0,
+          tax REAL NOT NULL DEFAULT 0.0,
+          created_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_movements (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL,
+          movement_type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          unit_price REAL,
+          total_value REAL,
+          reference_id TEXT,
+          reference_type TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          contact_person TEXT,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          balance REAL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS purchases (
+          id TEXT PRIMARY KEY,
+          invoice_number TEXT NOT NULL,
+          supplier_id TEXT NOT NULL,
+          supplier_invoice_number TEXT,
+          purchase_date TEXT NOT NULL,
+          payment_type TEXT NOT NULL DEFAULT 'cash',
+          total_amount REAL NOT NULL,
+          paid_amount REAL NOT NULL DEFAULT 0.0,
+          discount_amount REAL,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS purchase_items (
+          id TEXT PRIMARY KEY,
+          purchase_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          item_name TEXT NOT NULL,
+          unit TEXT NOT NULL DEFAULT 'number',
+          quantity REAL NOT NULL,
+          unit_price REAL NOT NULL,
+          discount REAL NOT NULL DEFAULT 0.0,
+          total REAL NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create indexes
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_shift_id ON shift_reports(shift_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_floor_id ON shift_reports(floor_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_shift_start ON shift_reports(shift_start)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_master_device_id ON shift_reports(master_device_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_sync_status ON shift_reports(sync_status)');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_item_id ON inventory_movements(item_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_movement_type ON inventory_movements(movement_type)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_created_at ON inventory_movements(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_reference_id ON inventory_movements(reference_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_master_device_id ON inventory_movements(master_device_id)');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_suppliers_master_device_id ON suppliers(master_device_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_suppliers_sync_status ON suppliers(sync_status)');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_supplier_id ON purchases(supplier_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_purchase_date ON purchases(purchase_date)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_master_device_id ON purchases(master_device_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase_id ON purchase_items(purchase_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchase_items_item_id ON purchase_items(item_id)');
+    }
+    
+    if (oldVersion < 20) {
+      // Add new columns to purchases and purchase_items tables
+      await _addPurchaseInvoiceColumns(db);
+    }
+  }
+  
+  /// Add new columns to purchases and purchase_items tables for version 20
+  Future<void> _addPurchaseInvoiceColumns(Database db) async {
+    try {
+      // Check purchases table columns
+      final purchasesResult = await db.rawQuery("PRAGMA table_info(purchases)");
+      final purchasesColumns = purchasesResult.map((row) => row['name'] as String).toSet();
+      
+      if (!purchasesColumns.contains('invoice_number')) {
+        await db.execute('ALTER TABLE purchases ADD COLUMN invoice_number TEXT');
+        // Generate invoice numbers for existing purchases
+        final purchases = await db.query('purchases');
+        for (var purchase in purchases) {
+          final invoiceNumber = 'PUR-${purchase['id'].toString().substring(0, 8).toUpperCase()}';
+          await db.update(
+            'purchases',
+            {'invoice_number': invoiceNumber},
+            where: 'id = ?',
+            whereArgs: [purchase['id']],
+          );
+        }
+      }
+      
+      if (!purchasesColumns.contains('supplier_invoice_number')) {
+        await db.execute('ALTER TABLE purchases ADD COLUMN supplier_invoice_number TEXT');
+      }
+      
+      if (!purchasesColumns.contains('payment_type')) {
+        await db.execute('ALTER TABLE purchases ADD COLUMN payment_type TEXT NOT NULL DEFAULT \'cash\'');
+      }
+      
+      // Check purchase_items table columns
+      final itemsResult = await db.rawQuery("PRAGMA table_info(purchase_items)");
+      final itemsColumns = itemsResult.map((row) => row['name'] as String).toSet();
+      
+      if (!itemsColumns.contains('unit')) {
+        await db.execute('ALTER TABLE purchase_items ADD COLUMN unit TEXT NOT NULL DEFAULT \'number\'');
+      }
+      
+      if (!itemsColumns.contains('discount')) {
+        await db.execute('ALTER TABLE purchase_items ADD COLUMN discount REAL NOT NULL DEFAULT 0.0');
+      }
+    } catch (e) {
+      debugPrint('Error adding purchase invoice columns: $e');
     }
   }
   
@@ -1236,6 +1546,18 @@ class DatabaseHelper {
     return maps.map((map) => Item.fromMap(map)).toList();
   }
 
+  Future<Item?> getItemById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'items',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Item.fromMap(maps.first);
+  }
+
   Future<List<Item>> getItemsBySubCategoryId(String subCategoryId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -1319,6 +1641,15 @@ class DatabaseHelper {
   Future<void> insertSale(Sale sale) async {
     final db = await database;
     
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('insertSale: Starting to save sale');
+    debugPrint('  Sale ID: ${sale.id}');
+    debugPrint('  Total: ${sale.total}');
+    debugPrint('  Payment Method: ${sale.paymentMethod}');
+    debugPrint('  Created At: ${sale.createdAt.toIso8601String()}');
+    debugPrint('  Items Count: ${sale.items.length}');
+    debugPrint('═══════════════════════════════════════════════════════');
+    
     // Ensure sales table has all required columns
     await _ensureSalesTableColumns(db);
     
@@ -1332,21 +1663,32 @@ class DatabaseHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       currentDeviceId = prefs.getString('current_device_id');
+      debugPrint('  Current Device ID from SharedPreferences: $currentDeviceId');
     } catch (e) {
-      debugPrint('Error getting current device ID: $e');
+      debugPrint('  ⚠️  Error getting current device ID: $e');
     }
     
+    final finalDeviceId = currentDeviceId ?? sale.deviceId;
+    debugPrint('  Final Device ID to save: $finalDeviceId');
+    
     final batch = db.batch();
+    
+    // Prepare sale map
+    final saleMap = sale.toMap(
+        masterDeviceId: masterDeviceId,
+        syncStatus: 'pending', // Mark as pending for sync
+        updatedAt: now,
+      deviceId: finalDeviceId,
+    );
+    
+    debugPrint('  Sale Map Keys: ${saleMap.keys.toList()}');
+    debugPrint('  Sale Map device_id: ${saleMap['device_id']}');
+    debugPrint('  Sale Map created_at: ${saleMap['created_at']}');
     
     // Insert sale with sync fields and device_id
     batch.insert(
       'sales',
-      sale.toMap(
-        masterDeviceId: masterDeviceId,
-        syncStatus: 'pending', // Mark as pending for sync
-        updatedAt: now,
-        deviceId: currentDeviceId ?? sale.deviceId,
-      ),
+      saleMap,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     
@@ -1364,6 +1706,20 @@ class DatabaseHelper {
     }
     
     await batch.commit(noResult: true);
+    
+    debugPrint('  ✓ Sale saved successfully to database');
+    debugPrint('═══════════════════════════════════════════════════════');
+    
+    // Verify the sale was saved
+    final savedSale = await getSaleById(sale.id);
+    if (savedSale != null) {
+      debugPrint('  ✓ Verification: Sale found in database');
+      debugPrint('    Saved Total: ${savedSale.total}');
+      debugPrint('    Saved Device ID: ${savedSale.deviceId}');
+      debugPrint('    Saved Created At: ${savedSale.createdAt.toIso8601String()}');
+    } else {
+      debugPrint('  ❌ ERROR: Sale not found in database after save!');
+    }
   }
 
   Future<List<Sale>> getAllSales() async {
@@ -1517,6 +1873,24 @@ class DatabaseHelper {
 
   Future<List<Sale>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
     final db = await database;
+    
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('getSalesByDateRange: Querying sales');
+    debugPrint('  Start Date: ${startDate.toIso8601String()}');
+    debugPrint('  End Date: ${endDate.toIso8601String()}');
+    
+    // First, let's check total sales count
+    final totalCountResult = await db.rawQuery('SELECT COUNT(*) as count FROM sales');
+    final totalCount = (totalCountResult.first['count'] as num?)?.toInt() ?? 0;
+    debugPrint('  Total sales in database: $totalCount');
+    
+    // Get all sales to see what we have
+    final allSalesMaps = await db.query('sales', limit: 5, orderBy: 'created_at DESC');
+    debugPrint('  Sample of all sales (last 5):');
+    for (var saleMap in allSalesMaps) {
+      debugPrint('    - ID: ${saleMap['id']}, Total: ${saleMap['total']}, Created: ${saleMap['created_at']}, Device: ${saleMap['device_id']}');
+    }
+    
     final List<Map<String, dynamic>> saleMaps = await db.query(
       'sales',
       where: 'created_at >= ? AND created_at <= ?',
@@ -1524,34 +1898,76 @@ class DatabaseHelper {
       orderBy: 'created_at DESC',
     );
     
+    debugPrint('  Found ${saleMaps.length} sales in date range');
+    
+    if (saleMaps.isEmpty) {
+      debugPrint('  ⚠️  WARNING: No sales found in date range!');
+      debugPrint('  Checking if any sales exist outside this range...');
+      final beforeCount = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM sales WHERE created_at < ?',
+        [startDate.toIso8601String()],
+      );
+      final afterCount = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM sales WHERE created_at > ?',
+        [endDate.toIso8601String()],
+      );
+      debugPrint('    Sales before range: ${(beforeCount.first['count'] as num?)?.toInt() ?? 0}');
+      debugPrint('    Sales after range: ${(afterCount.first['count'] as num?)?.toInt() ?? 0}');
+    }
+    
     final List<Sale> sales = [];
     for (var saleMap in saleMaps) {
       final sale = Sale.fromMap(saleMap);
       final items = await getSaleItemsBySaleId(sale.id);
       sales.add(sale.copyWith(items: items));
     }
+    
+    debugPrint('  Returning ${sales.length} sales with items');
+    debugPrint('═══════════════════════════════════════════════════════');
     
     return sales;
   }
 
   /// Get sales by device IDs and date range
+  /// If deviceIds is empty, returns all sales in date range (including those without device_id)
+  /// IMPORTANT: If deviceIds is provided but no matching sales found, returns ALL sales in date range
+  /// This ensures reports show all sales even if device_id doesn't match
   Future<List<Sale>> getSalesByDeviceIdsAndDateRange(
     List<String> deviceIds,
     DateTime startDate,
     DateTime endDate,
   ) async {
+    final db = await database;
+    
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('getSalesByDeviceIdsAndDateRange: Querying sales');
+    debugPrint('  Device IDs: $deviceIds (count: ${deviceIds.length})');
+    debugPrint('  Date range: ${startDate.toIso8601String()} to ${endDate.toIso8601String()}');
+    
+    // If deviceIds is empty, get all sales in date range (including null device_id)
     if (deviceIds.isEmpty) {
-      return [];
+      debugPrint('  No device IDs provided, getting all sales in date range');
+      return await getSalesByDateRange(startDate, endDate);
     }
     
-    final db = await database;
+    // First, try to get sales for the specified device IDs
     final placeholders = deviceIds.map((_) => '?').join(',');
     final List<Map<String, dynamic>> saleMaps = await db.query(
       'sales',
-      where: 'device_id IN ($placeholders) AND created_at >= ? AND created_at <= ?',
+      where: '(device_id IN ($placeholders) OR device_id IS NULL) AND created_at >= ? AND created_at <= ?',
       whereArgs: [...deviceIds, startDate.toIso8601String(), endDate.toIso8601String()],
       orderBy: 'created_at DESC',
     );
+    
+    debugPrint('  Found ${saleMaps.length} sales matching device IDs');
+    
+    // If no sales found with device IDs, get ALL sales in date range
+    // This handles the case where device_id format doesn't match
+    if (saleMaps.isEmpty) {
+      debugPrint('  ⚠️  No sales found with device IDs, getting ALL sales in date range');
+      debugPrint('  This ensures reports show all sales even if device_id format differs');
+      return await getSalesByDateRange(startDate, endDate);
+    }
     
     final List<Sale> sales = [];
     for (var saleMap in saleMaps) {
@@ -1559,6 +1975,9 @@ class DatabaseHelper {
       final items = await getSaleItemsBySaleId(sale.id);
       sales.add(sale.copyWith(items: items));
     }
+    
+    debugPrint('  Returning ${sales.length} sales with items');
+    debugPrint('═══════════════════════════════════════════════════════');
     
     return sales;
   }
@@ -2431,20 +2850,24 @@ class DatabaseHelper {
 
   // Inventory deduction methods
   /// Deduct raw materials from inventory based on recipe when item is sold
-  Future<void> deductInventoryForSale(String itemId, int quantity) async {
+  /// Returns list of low stock warnings if any raw materials are running low
+  Future<List<LowStockWarning>> deductInventoryForSale(String itemId, int quantity) async {
+    // Convert int to double for calculations
+    final quantityDouble = quantity.toDouble();
+    final warnings = <LowStockWarning>[];
     debugPrint('deductInventoryForSale called: itemId=$itemId, quantity=$quantity');
     final recipe = await getRecipeByItemId(itemId);
     if (recipe == null || recipe.ingredients.isEmpty) {
       // No recipe found, nothing to deduct
       debugPrint('No recipe found for itemId=$itemId or recipe has no ingredients');
-      return;
+      return warnings;
     }
     
     debugPrint('Recipe found for itemId=$itemId with ${recipe.ingredients.length} ingredients');
     
     // For each ingredient in the recipe, deduct the required quantity
     for (var ingredient in recipe.ingredients) {
-      final requiredQuantity = ingredient.quantity * quantity;
+      final requiredQuantity = ingredient.quantity * quantityDouble;
       debugPrint('Processing ingredient: rawMaterialId=${ingredient.rawMaterialId}, quantityPerUnit=${ingredient.quantity}, totalRequired=$requiredQuantity');
       
       // Get all batches for this raw material, ordered by expiry date (FIFO)
@@ -2494,7 +2917,319 @@ class DatabaseHelper {
       } else {
         debugPrint('Successfully deducted $totalDeducted for raw material ${ingredient.rawMaterialId}');
       }
+      
+      // Check for low stock after deduction
+      final rawMaterial = await getRawMaterialById(ingredient.rawMaterialId);
+      if (rawMaterial != null) {
+        final warning = _checkLowStock(
+          rawMaterial: rawMaterial,
+          requiredQuantity: requiredQuantity,
+        );
+        if (warning != null) {
+          warnings.add(warning);
+        }
+      }
     }
+    
+    return warnings;
+  }
+  
+  /// Check if raw material stock is low and return warning if needed
+  LowStockWarning? _checkLowStock({
+    required RawMaterial rawMaterial,
+    required double requiredQuantity,
+  }) {
+    final currentQuantity = rawMaterial.totalQuantity;
+    
+    // Calculate percentage remaining (assuming we need at least 10x the required quantity for safety)
+    final minimumSafeQuantity = requiredQuantity * 10;
+    final percentageRemaining = minimumSafeQuantity > 0 
+        ? (currentQuantity / minimumSafeQuantity) * 100 
+        : 0.0;
+    
+    // Show warning if stock is below 25% of safe minimum
+    if (currentQuantity <= 0 || percentageRemaining < 25) {
+      return LowStockWarning(
+        rawMaterialId: rawMaterial.id,
+        rawMaterialName: rawMaterial.name,
+        currentQuantity: currentQuantity,
+        requiredQuantity: requiredQuantity,
+        unit: rawMaterial.unit,
+        percentageRemaining: percentageRemaining.clamp(0.0, 100.0),
+      );
+    }
+    
+    return null;
+  }
+
+  // Shift Reports CRUD
+  Future<void> insertShiftReport(ShiftReport report) async {
+    final db = await database;
+    await db.insert(
+      'shift_reports',
+      report.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<ShiftReport>> getShiftReportsByDateRange(
+    DateTime startDate,
+    DateTime endDate, {
+    int? floorId,
+  }) async {
+    final db = await database;
+    String whereClause = 'shift_start >= ? AND shift_end <= ?';
+    List<dynamic> whereArgs = [
+      startDate.toIso8601String(),
+      endDate.toIso8601String(),
+    ];
+
+    if (floorId != null) {
+      whereClause += ' AND floor_id = ?';
+      whereArgs.add(floorId);
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'shift_reports',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'shift_start DESC',
+    );
+    return maps.map((map) => ShiftReport.fromMap(map)).toList();
+  }
+
+  Future<ShiftReport?> getShiftReportById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'shift_reports',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return ShiftReport.fromMap(maps.first);
+  }
+
+  // Inventory Movements CRUD
+  Future<void> insertInventoryMovement(InventoryMovement movement) async {
+    final db = await database;
+    
+    await db.insert(
+      'inventory_movements',
+      movement.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<InventoryMovement>> getInventoryMovementsByItemId(
+    String itemId, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final db = await database;
+    String whereClause = 'item_id = ?';
+    List<dynamic> whereArgs = [itemId];
+
+    if (startDate != null && endDate != null) {
+      whereClause += ' AND created_at >= ? AND created_at <= ?';
+      whereArgs.add(startDate.toIso8601String());
+      whereArgs.add(endDate.toIso8601String());
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_movements',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'created_at DESC',
+    );
+    return maps.map((map) => InventoryMovement.fromMap(map)).toList();
+  }
+
+  Future<List<InventoryMovement>> getInventoryMovementsByType(
+    String movementType, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final db = await database;
+    String whereClause = 'movement_type = ?';
+    List<dynamic> whereArgs = [movementType];
+
+    if (startDate != null && endDate != null) {
+      whereClause += ' AND created_at >= ? AND created_at <= ?';
+      whereArgs.add(startDate.toIso8601String());
+      whereArgs.add(endDate.toIso8601String());
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_movements',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'created_at DESC',
+    );
+    return maps.map((map) => InventoryMovement.fromMap(map)).toList();
+  }
+
+  // Suppliers CRUD
+  Future<void> insertSupplier(Supplier supplier) async {
+    final db = await database;
+    await db.insert(
+      'suppliers',
+      supplier.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Supplier>> getAllSuppliers() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'suppliers',
+      orderBy: 'name ASC',
+    );
+    return maps.map((map) => Supplier.fromMap(map)).toList();
+  }
+
+  Future<Supplier?> getSupplierById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'suppliers',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Supplier.fromMap(maps.first);
+  }
+
+  /// Get the next purchase invoice number (today's count + 1)
+  Future<String> getNextPurchaseInvoiceNumber() async {
+    try {
+      final db = await database;
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+      
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM purchases WHERE purchase_date >= ? AND purchase_date < ?',
+        [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
+      );
+      
+      final countValue = result.first['count'];
+      int count = 0;
+      if (countValue is int) {
+        count = countValue;
+      } else if (countValue is num) {
+        count = countValue.toInt();
+      } else {
+        count = int.tryParse(countValue.toString()) ?? 0;
+      }
+      
+      final nextNumber = count + 1;
+      final dateStr = '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
+      return 'PUR-$dateStr-${nextNumber.toString().padLeft(4, '0')}';
+    } catch (e) {
+      debugPrint('Error getting next purchase invoice number: $e');
+      final now = DateTime.now();
+      final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      return 'PUR-$dateStr-0001';
+    }
+  }
+
+  // Purchases CRUD
+  Future<void> insertPurchase(Purchase purchase) async {
+    final db = await database;
+    
+    final batch = db.batch();
+    
+    // Insert purchase
+    batch.insert(
+      'purchases',
+      purchase.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    
+    // Insert purchase items
+    for (var item in purchase.items) {
+      batch.insert(
+        'purchase_items',
+        item.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Purchase>> getPurchasesBySupplierId(
+    String supplierId, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final db = await database;
+    String whereClause = 'supplier_id = ?';
+    List<dynamic> whereArgs = [supplierId];
+
+    if (startDate != null && endDate != null) {
+      whereClause += ' AND purchase_date >= ? AND purchase_date <= ?';
+      whereArgs.add(startDate.toIso8601String());
+      whereArgs.add(endDate.toIso8601String());
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'purchases',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'purchase_date DESC',
+    );
+    
+    final List<Purchase> purchases = [];
+    for (var map in maps) {
+      final purchase = Purchase.fromMap(map);
+      final items = await getPurchaseItemsByPurchaseId(purchase.id);
+      purchases.add(purchase.copyWith(items: items));
+    }
+    
+    return purchases;
+  }
+
+  Future<List<PurchaseItem>> getPurchaseItemsByPurchaseId(String purchaseId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'purchase_items',
+      where: 'purchase_id = ?',
+      whereArgs: [purchaseId],
+    );
+    return maps.map((map) => PurchaseItem.fromMap(map)).toList();
+  }
+
+  Future<List<Purchase>> getAllPurchases({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final db = await database;
+    String whereClause = '1=1';
+    List<dynamic> whereArgs = [];
+
+    if (startDate != null && endDate != null) {
+      whereClause += ' AND purchase_date >= ? AND purchase_date <= ?';
+      whereArgs.add(startDate.toIso8601String());
+      whereArgs.add(endDate.toIso8601String());
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'purchases',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'purchase_date DESC',
+    );
+    
+    final List<Purchase> purchases = [];
+    for (var map in maps) {
+      final purchase = Purchase.fromMap(map);
+      final items = await getPurchaseItemsByPurchaseId(purchase.id);
+      purchases.add(purchase.copyWith(items: items));
+    }
+    
+    return purchases;
   }
 
   // Close database

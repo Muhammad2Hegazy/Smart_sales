@@ -592,6 +592,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                             DropdownButtonFormField<Category>(
                               // ignore: deprecated_member_use
                               value: selectedCategory,
+                              isExpanded: true,
                               decoration: InputDecoration(
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(AppBorderRadius.md),
@@ -677,6 +678,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                               DropdownButtonFormField<SubCategory>(
                                 // ignore: deprecated_member_use
                                 value: selectedSubCategory,
+                                isExpanded: true,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(AppBorderRadius.md),
@@ -1461,6 +1463,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 DropdownButtonFormField<RawMaterial>(
                   value: selectedMaterial,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppBorderRadius.md),
@@ -1621,6 +1624,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 DropdownButtonFormField<RawMaterial>(
                   value: selectedMaterial,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppBorderRadius.md),

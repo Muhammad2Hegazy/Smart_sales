@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:uuid/uuid.dart';
 import '../l10n/app_localizations.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
@@ -129,13 +128,6 @@ class _FinancialScreenState extends State<FinancialScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(l10n.profitLoss),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddTransactionDialog(context),
-            tooltip: l10n.addTransaction,
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -460,149 +452,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
     );
   }
 
-  void _showAddTransactionDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final financialBloc = context.read<FinancialBloc>();
-    final descriptionController = TextEditingController();
-    final amountController = TextEditingController();
-    String selectedType = 'cash_in';
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => MultiBlocProvider(
-        providers: [
-          BlocProvider<FinancialBloc>.value(value: financialBloc),
-        ],
-        child: StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(l10n.addTransaction),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SegmentedButton<String>(
-                segments: [
-                  ButtonSegment(
-                    value: 'cash_in',
-                    label: Text(l10n.cashIn),
-                    icon: const Icon(Icons.arrow_downward),
-                  ),
-                  ButtonSegment(
-                    value: 'cash_out',
-                    label: Text(l10n.cashOut),
-                    icon: const Icon(Icons.arrow_upward),
-                  ),
-                ],
-                selected: {selectedType},
-                onSelectionChanged: (Set<String> newSelection) {
-                  setDialogState(() {
-                    selectedType = newSelection.first;
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: descriptionController,
-                decoration: InputDecoration(
-                  labelText: l10n.description,
-                  hintText: l10n.enterDescription,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: amountController,
-                decoration: InputDecoration(
-                  labelText: l10n.amount,
-                  hintText: l10n.enterAmount,
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-            ],
-          ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: Text(l10n.cancel),
-              ),
-              AppButton(
-                label: l10n.save,
-                onPressed: () async {
-                  if (descriptionController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(
-                        content: Text('Please enter description'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-
-                  if (amountController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(
-                        content: Text('Please enter amount'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-
-                  final amount = double.tryParse(amountController.text.trim());
-                  if (amount == null || amount <= 0) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(
-                        content: Text('Please enter a valid amount greater than 0'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-
-                  try {
-                    final transaction = FinancialTransaction(
-                      id: const Uuid().v4(),
-                      type: selectedType == 'cash_in' ? TransactionType.cashIn : TransactionType.cashOut,
-                      amount: amount,
-                      description: descriptionController.text.trim(),
-                      createdAt: DateTime.now(),
-                    );
-                    
-                    financialBloc.add(
-                      AddFinancialTransaction(transaction),
-                    );
-                    
-                    // Wait for the bloc to process
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    
-                    if (dialogContext.mounted) {
-                      Navigator.pop(dialogContext);
-                      _loadTransactions();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.transactionAdded),
-                          backgroundColor: AppColors.secondary,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        SnackBar(
-                          content: Text('Error adding transaction: $e'),
-                          backgroundColor: AppColors.error,
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // Removed - moved to PurchaseInvoiceScreen
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';

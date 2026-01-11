@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:data_table_2/data_table_2.dart';
 import '../l10n/app_localizations.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
@@ -149,35 +150,64 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildMaterialsTable(BuildContext context, AppLocalizations l10n) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: DataTable(
-            headingRowColor: MaterialStateProperty.all(AppColors.primary.withValues(alpha: 0.1)),
-            columns: [
-              DataColumn(label: Text(l10n.materialNameColumn)),
-              DataColumn(label: Text(l10n.quantityColumn)),
-              DataColumn(label: Text(l10n.expiryDateColumn)),
-              const DataColumn(label: Text('')),
-            ],
-            rows: _buildTableRows(context, l10n),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: DataTable2(
+        columnSpacing: 12,
+        horizontalMargin: 12,
+        minWidth: 800,
+        headingRowColor: MaterialStateProperty.all(AppColors.primary.withValues(alpha: 0.1)),
+        headingRowHeight: 50,
+        dataRowHeight: 50,
+        smRatio: 0.75,
+        lmRatio: 1.5,
+        columns: [
+          DataColumn2(
+            label: Text(
+              l10n.materialNameColumn,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            size: ColumnSize.L,
           ),
-        ),
+          DataColumn2(
+            label: Text(
+              l10n.quantityColumn,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            size: ColumnSize.M,
+          ),
+          DataColumn2(
+            label: Text(
+              l10n.expiryDateColumn,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            size: ColumnSize.M,
+          ),
+          const DataColumn2(
+            label: Text(''),
+            size: ColumnSize.S,
+          ),
+        ],
+        rows: _buildTableRows(context, l10n),
       ),
     );
   }
 
-  List<DataRow> _buildTableRows(BuildContext context, AppLocalizations l10n) {
-    final rows = <DataRow>[];
+  List<DataRow2> _buildTableRows(BuildContext context, AppLocalizations l10n) {
+    final rows = <DataRow2>[];
     final dateFormat = DateFormat('yyyy-MM-dd');
 
     for (var material in _materials) {
       if (material.batches.isEmpty) {
         // Material with no batches
         rows.add(
-          DataRow(
+          DataRow2(
             cells: [
               DataCell(Text(material.name)),
               DataCell(
@@ -203,7 +233,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       } else {
         // Material with batches - first row shows material name and total
         rows.add(
-          DataRow(
+          DataRow2(
             color: MaterialStateProperty.all(AppColors.primary.withValues(alpha: 0.05)),
             cells: [
               DataCell(
@@ -236,7 +266,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           final isExpiringSoon = batch.isExpiringSoon;
           
           rows.add(
-            DataRow(
+            DataRow2(
               color: MaterialStateProperty.all(
                 isExpired
                     ? AppColors.error.withValues(alpha: 0.1)
@@ -332,6 +362,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 DropdownButtonFormField<String>(
                   value: selectedUnit,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppBorderRadius.md),

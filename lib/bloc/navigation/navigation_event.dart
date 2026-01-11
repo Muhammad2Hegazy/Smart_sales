@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum MenuItem { pos, inventory, items, reports, profitLoss, settings }
+enum MenuItem { pos, purchaseInvoice, inventory, items, reports, profitLoss, settings }
 
 abstract class NavigationEvent extends Equatable {
   const NavigationEvent();
