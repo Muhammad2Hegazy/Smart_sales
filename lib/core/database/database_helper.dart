@@ -19,8 +19,13 @@ import '../models/user_profile.dart';
 import '../models/user_permission.dart';
 import '../models/raw_material.dart';
 import '../models/raw_material_batch.dart';
+import '../models/raw_material_category.dart';
+import '../models/raw_material_sub_category.dart';
+import '../models/raw_material_unit.dart';
 import '../models/recipe.dart';
 import '../models/recipe_ingredient.dart';
+import '../models/invoice.dart';
+import '../models/invoice_item.dart';
 import '../models/low_stock_warning.dart';
 import '../models/shift_report.dart';
 import '../models/inventory_movement.dart';
@@ -60,7 +65,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       dbPath,
-      version: 20, // Incremented for purchase invoice enhancements (invoice_number, payment_type, supplier_invoice_number, discount per item)
+      version: 26, // Ensure water base unit is carton
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -301,14 +306,56 @@ class DatabaseHelper {
       )
     ''');
 
+    // Raw material categories table
+    await db.execute('''
+      CREATE TABLE raw_material_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Raw material sub categories table
+    await db.execute('''
+      CREATE TABLE raw_material_sub_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (category_id) REFERENCES raw_material_categories(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Raw materials table
     await db.execute('''
       CREATE TABLE raw_materials (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        category TEXT,
+        base_unit TEXT NOT NULL DEFAULT 'gram',
+        stock_quantity REAL NOT NULL DEFAULT 0,
+        minimum_alert_quantity REAL NOT NULL DEFAULT 0,
         unit TEXT NOT NULL DEFAULT 'number',
+        sub_category_id TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (sub_category_id) REFERENCES raw_material_sub_categories(id) ON DELETE SET NULL
+      )
+    ''');
+    
+    // Raw material units table for unit conversions
+    await db.execute('''
+      CREATE TABLE raw_material_units (
+        id TEXT PRIMARY KEY,
+        raw_material_id TEXT NOT NULL,
+        unit TEXT NOT NULL,
+        conversion_factor_to_base REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE,
+        UNIQUE(raw_material_id, unit)
       )
     ''');
 
@@ -318,7 +365,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         raw_material_id TEXT NOT NULL,
         quantity REAL NOT NULL,
-        expiry_date TEXT NOT NULL,
+        expiry_date TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
@@ -346,11 +393,36 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         recipe_id TEXT NOT NULL,
         raw_material_id TEXT NOT NULL,
-        quantity REAL NOT NULL,
+        quantity_required_in_base_unit REAL NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
         FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+      )
+    ''');
+    
+    // Invoices table
+    await db.execute('''
+      CREATE TABLE invoices (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    
+    // Invoice items table
+    await db.execute('''
+      CREATE TABLE invoice_items (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        quantity_sold REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+        FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
       )
     ''');
 
@@ -657,7 +729,8 @@ class DatabaseHelper {
           id TEXT PRIMARY KEY,
           raw_material_id TEXT NOT NULL,
           quantity REAL NOT NULL,
-          expiry_date TEXT NOT NULL,
+          price REAL,
+          expiry_date TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
           FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
@@ -827,6 +900,36 @@ class DatabaseHelper {
     if (oldVersion < 20) {
       // Add new columns to purchases and purchase_items tables
       await _addPurchaseInvoiceColumns(db);
+    }
+    
+    if (oldVersion < 21) {
+      // Add raw material categories and subcategories, update raw_materials table
+      await _addRawMaterialCategories(db);
+    }
+    
+    if (oldVersion < 22) {
+      // Restaurant Inventory, Recipe & Invoice Management System
+      await _addRestaurantInventorySystem(db);
+    }
+    
+    if (oldVersion < 23) {
+      // Make expiry_date optional in raw_material_batches
+      await _makeExpiryDateOptional(db);
+    }
+    
+    if (oldVersion < 24) {
+      // Add price column to raw_material_batches
+      await _addPriceToBatches(db);
+    }
+    
+    if (oldVersion < 25) {
+      // Update water base unit to carton
+      await _updateWaterBaseUnit(db);
+    }
+    
+    if (oldVersion < 26) {
+      // Ensure water base unit is carton (force update)
+      await _updateWaterBaseUnit(db);
     }
   }
   
@@ -2536,6 +2639,89 @@ class DatabaseHelper {
     );
   }
 
+  // Raw Material Categories CRUD
+  Future<void> insertRawMaterialCategory(RawMaterialCategory category) async {
+    final db = await database;
+    await db.insert(
+      'raw_material_categories',
+      category.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<RawMaterialCategory>> getAllRawMaterialCategories() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_material_categories',
+      orderBy: 'name ASC',
+    );
+    final categories = <RawMaterialCategory>[];
+    
+    for (var map in maps) {
+      final category = RawMaterialCategory.fromMap(map);
+      final subCategories = await getRawMaterialSubCategoriesByCategoryId(category.id);
+      categories.add(category.copyWith(subCategories: subCategories));
+    }
+    
+    return categories;
+  }
+
+  Future<void> deleteRawMaterialCategory(String id) async {
+    final db = await database;
+    await db.delete('raw_material_categories', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Raw Material Sub Categories CRUD
+  Future<void> insertRawMaterialSubCategory(RawMaterialSubCategory subCategory) async {
+    final db = await database;
+    await db.insert(
+      'raw_material_sub_categories',
+      subCategory.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<RawMaterialSubCategory>> getAllRawMaterialSubCategories() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_material_sub_categories',
+      orderBy: 'name ASC',
+    );
+    final subCategories = <RawMaterialSubCategory>[];
+    
+    for (var map in maps) {
+      final subCategory = RawMaterialSubCategory.fromMap(map);
+      final materials = await getRawMaterialsBySubCategoryId(subCategory.id);
+      subCategories.add(subCategory.copyWith(materials: materials));
+    }
+    
+    return subCategories;
+  }
+
+  Future<List<RawMaterialSubCategory>> getRawMaterialSubCategoriesByCategoryId(String categoryId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_material_sub_categories',
+      where: 'category_id = ?',
+      whereArgs: [categoryId],
+      orderBy: 'name ASC',
+    );
+    final subCategories = <RawMaterialSubCategory>[];
+    
+    for (var map in maps) {
+      final subCategory = RawMaterialSubCategory.fromMap(map);
+      final materials = await getRawMaterialsBySubCategoryId(subCategory.id);
+      subCategories.add(subCategory.copyWith(materials: materials));
+    }
+    
+    return subCategories;
+  }
+
+  Future<void> deleteRawMaterialSubCategory(String id) async {
+    final db = await database;
+    await db.delete('raw_material_sub_categories', where: 'id = ?', whereArgs: [id]);
+  }
+
   // Raw Materials CRUD
   Future<void> insertRawMaterial(RawMaterial material) async {
     final db = await database;
@@ -2572,6 +2758,34 @@ class DatabaseHelper {
     }
     
     return materials;
+  }
+
+  Future<List<RawMaterial>> getRawMaterialsBySubCategoryId(String subCategoryId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_materials',
+      where: 'sub_category_id = ?',
+      whereArgs: [subCategoryId],
+      orderBy: 'name ASC',
+    );
+    final materials = <RawMaterial>[];
+    
+    // Load batches for each material
+    for (var map in maps) {
+      final material = RawMaterial.fromMap(map);
+      final batches = await getRawMaterialBatches(material.id);
+      materials.add(material.copyWith(batches: batches));
+    }
+    
+    return materials;
+  }
+
+  Future<void> deleteAllRawMaterials() async {
+    final db = await database;
+    await db.delete('raw_material_batches');
+    await db.delete('raw_materials');
+    await db.delete('raw_material_sub_categories');
+    await db.delete('raw_material_categories');
   }
 
   Future<RawMaterial?> getRawMaterialById(String id) async {
@@ -2612,6 +2826,9 @@ class DatabaseHelper {
       batch.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    
+    // Recalculate stock quantity from all batches
+    await _recalculateStockQuantity(batch.rawMaterialId);
     
     // Update raw material updated_at
     await db.update(
@@ -2667,6 +2884,9 @@ class DatabaseHelper {
       whereArgs: [batch.id],
     );
     
+    // Recalculate stock quantity from all batches
+    await _recalculateStockQuantity(batch.rawMaterialId);
+    
     // Update raw material updated_at
     await db.update(
       'raw_materials',
@@ -2675,14 +2895,34 @@ class DatabaseHelper {
       whereArgs: [batch.rawMaterialId],
     );
   }
+  
+  /// Recalculate stock quantity from all batches
+  Future<void> _recalculateStockQuantity(String rawMaterialId) async {
+    final db = await database;
+    final batches = await getRawMaterialBatches(rawMaterialId);
+    final totalQuantity = batches.fold<double>(0.0, (sum, batch) => sum + batch.quantity);
+    
+    await db.update(
+      'raw_materials',
+      {
+        'stock_quantity': totalQuantity,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [rawMaterialId],
+    );
+  }
 
   Future<void> deleteRawMaterialBatch(String id) async {
     final db = await database;
     // Get batch to update raw material
     final batch = await getRawMaterialBatchById(id);
+    if (batch != null) {
     await db.delete('raw_material_batches', where: 'id = ?', whereArgs: [id]);
     
-    if (batch != null) {
+      // Recalculate stock quantity from all remaining batches
+      await _recalculateStockQuantity(batch.rawMaterialId);
+      
       // Update raw material updated_at
       await db.update(
         'raw_materials',
@@ -2690,6 +2930,8 @@ class DatabaseHelper {
         where: 'id = ?',
         whereArgs: [batch.rawMaterialId],
       );
+    } else {
+      await db.delete('raw_material_batches', where: 'id = ?', whereArgs: [id]);
     }
   }
 
@@ -2873,7 +3115,12 @@ class DatabaseHelper {
       // Get all batches for this raw material, ordered by expiry date (FIFO)
       final batches = await getRawMaterialBatches(ingredient.rawMaterialId);
       debugPrint('Found ${batches.length} batches for raw material ${ingredient.rawMaterialId}');
-      batches.sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
+      batches.sort((a, b) {
+        if (a.expiryDate == null && b.expiryDate == null) return 0;
+        if (a.expiryDate == null) return 1; // nulls go to end
+        if (b.expiryDate == null) return -1; // nulls go to end
+        return a.expiryDate!.compareTo(b.expiryDate!);
+      });
       
       double remainingToDeduct = requiredQuantity;
       double totalDeducted = 0.0;
@@ -3230,6 +3477,1000 @@ class DatabaseHelper {
     }
     
     return purchases;
+  }
+
+  /// Add raw material categories and subcategories for version 21
+  Future<void> _addRawMaterialCategories(Database db) async {
+    try {
+      // Create raw_material_categories table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_material_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      
+      // Create raw_material_sub_categories table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_material_sub_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          category_id TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (category_id) REFERENCES raw_material_categories(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // Add sub_category_id column to raw_materials table
+      try {
+        final result = await db.rawQuery("PRAGMA table_info(raw_materials)");
+        final hasSubCategoryId = result.any((row) => row['name'] == 'sub_category_id');
+        
+        if (!hasSubCategoryId) {
+          await db.execute('ALTER TABLE raw_materials ADD COLUMN sub_category_id TEXT');
+          await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_materials_sub_category_id ON raw_materials(sub_category_id)');
+        }
+      } catch (e) {
+        debugPrint('Error adding sub_category_id to raw_materials: $e');
+      }
+      
+      // Update existing water material to use carton as base unit
+      await db.update(
+        'raw_materials',
+        {
+          'base_unit': 'carton',
+          'unit': 'كرتونة',
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'name = ?',
+        whereArgs: ['ماء'],
+      );
+      
+      // Delete all existing raw materials and batches
+      await db.delete('raw_material_batches');
+      await db.delete('raw_materials');
+      await db.delete('raw_material_sub_categories');
+      await db.delete('raw_material_categories');
+      
+      // Add all raw materials data
+      await _populateRawMaterialsData(db);
+      
+      debugPrint('Raw material categories tables created and data populated');
+    } catch (e) {
+      debugPrint('Error adding raw material categories: $e');
+    }
+  }
+
+  /// Populate raw materials data
+  Future<void> _populateRawMaterialsData(Database db) async {
+    final now = DateTime.now();
+    final uuid = const Uuid();
+    
+    // Helper function to create category
+    Future<String> createCategory(String name) async {
+      final id = uuid.v4();
+      await db.insert('raw_material_categories', {
+        'id': id,
+        'name': name,
+        'created_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      });
+      return id;
+    }
+    
+    // Helper function to create subcategory
+    Future<String> createSubCategory(String name, String categoryId) async {
+      final id = uuid.v4();
+      await db.insert('raw_material_sub_categories', {
+        'id': id,
+        'name': name,
+        'category_id': categoryId,
+        'created_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      });
+      return id;
+    }
+    
+    // Helper function to create raw material
+    Future<void> createRawMaterial(String name, String unit, String subCategoryId, {String? baseUnit}) async {
+      // Determine base unit: use provided baseUnit if available, otherwise infer from unit
+      String materialBaseUnit;
+      if (baseUnit != null) {
+        // Use provided baseUnit directly
+        materialBaseUnit = baseUnit;
+      } else if (unit == 'kg' || unit == 'kilogram' || unit == 'جرام' || unit == 'كيلو') {
+        materialBaseUnit = 'gram'; // Weight-based materials use gram as base
+      } else if (unit == 'ml' || unit == 'مل' || unit == 'liter' || unit == 'l') {
+        materialBaseUnit = 'ml';
+      } else if (unit == 'piece' || unit == 'قطعة') {
+        materialBaseUnit = 'piece';
+      } else if (unit == 'carton' || unit == 'كرتونة') {
+        materialBaseUnit = 'carton';
+      } else if (unit == 'packet' || unit == 'باكيت') {
+        materialBaseUnit = 'packet';
+      } else if (unit == 'jar' || unit == 'جرة') {
+        materialBaseUnit = 'jar';
+      } else if (unit == 'bag') {
+        materialBaseUnit = 'packet'; // bag is treated as packet
+      } else {
+        materialBaseUnit = 'piece';
+      }
+      
+      final materialId = uuid.v4();
+      await db.insert('raw_materials', {
+        'id': materialId,
+        'name': name,
+        'unit': unit,
+        'base_unit': materialBaseUnit,
+        'sub_category_id': subCategoryId,
+        'created_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      });
+      
+      // Add unit conversions based on base unit
+      if (materialBaseUnit == 'carton') {
+        // 1 carton = 20 bottles (default, can be changed to 24)
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'bottle',
+          'conversion_factor_to_base': 1.0 / 20.0, // 1 bottle = 1/20 carton
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'زجاجة',
+          'conversion_factor_to_base': 1.0 / 20.0, // 1 زجاجة = 1/20 كرتونة
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+      } else if (materialBaseUnit == 'packet') {
+        // 1 packet = 10kg = 10000g (packet is stored in grams as base)
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'kilogram',
+          'conversion_factor_to_base': 10000.0, // 1 kg = 10000g (but packet is base, so 1 packet = 10000g)
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'كيلو',
+          'conversion_factor_to_base': 10000.0,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+      } else if (materialBaseUnit == 'gram') {
+        // Add kilogram conversion
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'kilogram',
+          'conversion_factor_to_base': 1000.0, // 1 kg = 1000g
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'كيلو',
+          'conversion_factor_to_base': 1000.0,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+      } else if (materialBaseUnit == 'ml') {
+        // Add liter conversion
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'liter',
+          'conversion_factor_to_base': 1000.0, // 1 L = 1000ml
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+        await db.insert('raw_material_units', {
+          'id': uuid.v4(),
+          'raw_material_id': materialId,
+          'unit': 'لتر',
+          'conversion_factor_to_base': 1000.0,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+      }
+    }
+    
+    // 1. البروتينات
+    final proteinCategoryId = await createCategory('البروتينات');
+    
+    // لحوم
+    final meatSubCategoryId = await createSubCategory('لحوم', proteinCategoryId);
+    await createRawMaterial('لحم برجر', 'جرام', meatSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('كفتة', 'جرام', meatSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('سجق', 'جرام', meatSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('لحمة قطع', 'جرام', meatSubCategoryId, baseUnit: 'gram');
+    
+    // دواجن
+    final poultrySubCategoryId = await createSubCategory('دواجن', proteinCategoryId);
+    await createRawMaterial('صدور فراخ', 'جرام', poultrySubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('شيش طاووق', 'جرام', poultrySubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('كرسبي تشيكن', 'جرام', poultrySubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('استربس تشيكن', 'جرام', poultrySubCategoryId, baseUnit: 'gram');
+    
+    // 2. الألبان ومنتجاتها
+    final dairyCategoryId = await createCategory('الألبان ومنتجاتها');
+    
+    // أجبان
+    final cheeseSubCategoryId = await createSubCategory('أجبان', dairyCategoryId);
+    await createRawMaterial('موزاريلا', 'جرام', cheeseSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('شيدر', 'جرام', cheeseSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('رومي', 'جرام', cheeseSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('موزاريلا استيك', 'جرام', cheeseSubCategoryId, baseUnit: 'gram');
+    
+    // دهون
+    final fatsSubCategoryId = await createSubCategory('دهون', dairyCategoryId);
+    await createRawMaterial('زبدة', 'جرام', fatsSubCategoryId, baseUnit: 'gram');
+    
+    // كريمة
+    final creamSubCategoryId = await createSubCategory('كريمة', dairyCategoryId);
+    await createRawMaterial('كريمة طبخ', 'مل', creamSubCategoryId, baseUnit: 'ml');
+    
+    // 3. النشويات
+    final starchCategoryId = await createCategory('النشويات');
+    
+    // بطاطس
+    final potatoSubCategoryId = await createSubCategory('بطاطس', starchCategoryId);
+    await createRawMaterial('بطاطس', 'جرام', potatoSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('ودجز', 'جرام', potatoSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('كيرلي', 'جرام', potatoSubCategoryId, baseUnit: 'gram');
+    
+    // حبوب
+    final grainsSubCategoryId = await createSubCategory('حبوب', starchCategoryId);
+    await createRawMaterial('أرز', 'جرام', grainsSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('مكرونة', 'جرام', grainsSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('دقيق', 'جرام', grainsSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('بقسماط', 'جرام', grainsSubCategoryId, baseUnit: 'gram');
+    
+    // مخبوزات
+    final bakerySubCategoryId = await createSubCategory('مخبوزات', starchCategoryId);
+    await createRawMaterial('عيش سوري', 'قطعة', bakerySubCategoryId, baseUnit: 'piece');
+    await createRawMaterial('عيش برجر', 'قطعة', bakerySubCategoryId, baseUnit: 'piece');
+    await createRawMaterial('عيش بلدي', 'قطعة', bakerySubCategoryId, baseUnit: 'piece');
+    
+    // 4. الخضار
+    final vegetablesCategoryId = await createCategory('الخضار');
+    
+    // ورقيات
+    final leafySubCategoryId = await createSubCategory('ورقيات', vegetablesCategoryId);
+    await createRawMaterial('خس', 'جرام', leafySubCategoryId, baseUnit: 'gram');
+    
+    // خضار طازج
+    final freshVegetablesSubCategoryId = await createSubCategory('خضار طازج', vegetablesCategoryId);
+    await createRawMaterial('طماطم', 'جرام', freshVegetablesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('خيار', 'جرام', freshVegetablesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('بصل', 'جرام', freshVegetablesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('فلفل', 'جرام', freshVegetablesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('مشروم', 'جرام', freshVegetablesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('ثوم', 'جرام', freshVegetablesSubCategoryId, baseUnit: 'gram');
+    
+    // إضافات خضراء
+    final greenAdditionsSubCategoryId = await createSubCategory('إضافات خضراء', vegetablesCategoryId);
+    await createRawMaterial('ليمون', 'قطعة', greenAdditionsSubCategoryId, baseUnit: 'piece');
+    
+    // 5. الصوصات
+    final saucesCategoryId = await createCategory('الصوصات');
+    
+    // صوصات أساسية
+    final basicSaucesSubCategoryId = await createSubCategory('صوصات أساسية', saucesCategoryId);
+    await createRawMaterial('مايونيز', 'جرام', basicSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('كاتشب', 'جرام', basicSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('مستردة', 'جرام', basicSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('باربكيو', 'جرام', basicSaucesSubCategoryId, baseUnit: 'gram');
+    
+    // صوصات خاصة
+    final specialSaucesSubCategoryId = await createSubCategory('صوصات خاصة', saucesCategoryId);
+    await createRawMaterial('رانش', 'جرام', specialSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('ثاوزند', 'جرام', specialSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('شيبوتلي', 'جرام', specialSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('صوص جبنة', 'جرام', specialSaucesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('ثومية', 'جرام', specialSaucesSubCategoryId, baseUnit: 'gram');
+    
+    // 6. التوابل والتتبيل
+    final spicesCategoryId = await createCategory('التوابل والتتبيل');
+    
+    // تتبيلات
+    final marinadesSubCategoryId = await createSubCategory('تتبيلات', spicesCategoryId);
+    await createRawMaterial('تتبيلة فراخ', 'جرام', marinadesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('تتبيلة شيش', 'جرام', marinadesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('تتبيلة برجر', 'جرام', marinadesSubCategoryId, baseUnit: 'gram');
+    
+    // بهارات
+    final spicesSubCategoryId = await createSubCategory('بهارات', spicesCategoryId);
+    await createRawMaterial('ملح', 'جرام', spicesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('فلفل أسود', 'جرام', spicesSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('بابريكا', 'جرام', spicesSubCategoryId, baseUnit: 'gram');
+    
+    // 7. الزيوت والدهون
+    final oilsCategoryId = await createCategory('الزيوت والدهون');
+    
+    // زيوت
+    final oilsSubCategoryId = await createSubCategory('زيوت', oilsCategoryId);
+    await createRawMaterial('زيت قلي', 'كرتونة', oilsSubCategoryId, baseUnit: 'carton');
+    await createRawMaterial('زيت طبخ', 'كرتونة', oilsSubCategoryId, baseUnit: 'carton');
+    
+    // 8. إضافات عامة
+    final generalCategoryId = await createCategory('إضافات عامة');
+    final generalSubCategoryId = await createSubCategory('إضافات عامة', generalCategoryId);
+    await createRawMaterial('خل', 'مل', generalSubCategoryId, baseUnit: 'ml');
+    await createRawMaterial('سكر', 'كيلو', generalSubCategoryId, baseUnit: 'gram');
+    await createRawMaterial('ماء', 'كرتونة', generalSubCategoryId, baseUnit: 'carton');
+    
+    debugPrint('Raw materials data populated successfully');
+  }
+
+  /// Add price column to raw_material_batches for version 24
+  Future<void> _addPriceToBatches(Database db) async {
+    try {
+      final result = await db.rawQuery("PRAGMA table_info(raw_material_batches)");
+      final columns = result.map((row) => row['name'] as String).toSet();
+      
+      if (!columns.contains('price')) {
+        await db.execute('ALTER TABLE raw_material_batches ADD COLUMN price REAL');
+        debugPrint('Added price column to raw_material_batches');
+      }
+    } catch (e) {
+      debugPrint('Error adding price column to raw_material_batches: $e');
+    }
+  }
+
+  /// Update water base unit to carton for version 25
+  Future<void> _updateWaterBaseUnit(Database db) async {
+    try {
+      debugPrint('Starting _updateWaterBaseUnit migration...');
+      
+      // Materials that should use carton as base unit
+      final cartonMaterials = ['ماء', 'زيت قلي', 'زيت طبخ'];
+      
+      for (var materialName in cartonMaterials) {
+        // Get all materials with this name (in case there are multiple)
+        final materialMaps = await db.query(
+          'raw_materials',
+          where: 'name = ?',
+          whereArgs: [materialName],
+        );
+        
+        debugPrint('Found ${materialMaps.length} $materialName material(s)');
+        
+        for (var materialMap in materialMaps) {
+          final materialId = materialMap['id'] as String;
+          final currentBaseUnit = materialMap['base_unit'] as String?;
+          
+          debugPrint('$materialName ID: $materialId, current base_unit: $currentBaseUnit');
+          
+          // Update material to use carton as base unit
+          final updateCount = await db.update(
+            'raw_materials',
+            {
+              'base_unit': 'carton',
+              'unit': 'كرتونة',
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [materialId],
+          );
+          
+          debugPrint('Updated $updateCount row(s) for $materialName ID: $materialId');
+          
+          // Delete existing unit conversions
+          final deleteCount = await db.delete('raw_material_units', where: 'raw_material_id = ?', whereArgs: [materialId]);
+          debugPrint('Deleted $deleteCount unit conversion(s) for $materialName ID: $materialId');
+          
+          // Add new unit conversions for carton
+          final now = DateTime.now();
+          final uuid = const Uuid();
+          
+          // For water, add bottle conversions
+          if (materialName == 'ماء') {
+            await db.insert('raw_material_units', {
+              'id': uuid.v4(),
+              'raw_material_id': materialId,
+              'unit': 'bottle',
+              'conversion_factor_to_base': 1.0 / 20.0, // 1 bottle = 1/20 carton
+              'created_at': now.toIso8601String(),
+              'updated_at': now.toIso8601String(),
+            });
+            await db.insert('raw_material_units', {
+              'id': uuid.v4(),
+              'raw_material_id': materialId,
+              'unit': 'زجاجة',
+              'conversion_factor_to_base': 1.0 / 20.0, // 1 زجاجة = 1/20 كرتونة
+              'created_at': now.toIso8601String(),
+              'updated_at': now.toIso8601String(),
+            });
+          }
+          // For oils, you might want different conversions (e.g., liter to carton)
+          // For now, we'll just set carton as base unit
+          
+          debugPrint('Added unit conversions for $materialName ID: $materialId');
+        }
+      }
+      
+      debugPrint('Completed _updateWaterBaseUnit migration');
+    } catch (e, stackTrace) {
+      debugPrint('Error updating water base unit: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Make expiry_date optional in raw_material_batches for version 23
+  Future<void> _makeExpiryDateOptional(Database db) async {
+    try {
+      // SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+      // First, create a new table with nullable expiry_date
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_material_batches_new (
+          id TEXT PRIMARY KEY,
+          raw_material_id TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          expiry_date TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // Copy data from old table to new table
+      await db.execute('''
+        INSERT INTO raw_material_batches_new 
+        SELECT * FROM raw_material_batches
+      ''');
+      
+      // Drop old table
+      await db.execute('DROP TABLE raw_material_batches');
+      
+      // Rename new table
+      await db.execute('ALTER TABLE raw_material_batches_new RENAME TO raw_material_batches');
+      
+      // Recreate index
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_batches_raw_material_id ON raw_material_batches(raw_material_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_batches_expiry_date ON raw_material_batches(expiry_date)');
+      
+      debugPrint('Made expiry_date optional in raw_material_batches');
+    } catch (e) {
+      debugPrint('Error making expiry_date optional: $e');
+      // If migration fails, we'll handle null expiry_date in the model
+    }
+  }
+
+  /// Add Restaurant Inventory, Recipe & Invoice Management System for version 22
+  Future<void> _addRestaurantInventorySystem(Database db) async {
+    try {
+      // Add new columns to raw_materials table
+      try {
+        final result = await db.rawQuery("PRAGMA table_info(raw_materials)");
+        final columns = result.map((row) => row['name'] as String).toSet();
+        
+        if (!columns.contains('category')) {
+          await db.execute('ALTER TABLE raw_materials ADD COLUMN category TEXT');
+        }
+        if (!columns.contains('base_unit')) {
+          await db.execute('ALTER TABLE raw_materials ADD COLUMN base_unit TEXT NOT NULL DEFAULT \'gram\'');
+        }
+        if (!columns.contains('stock_quantity')) {
+          await db.execute('ALTER TABLE raw_materials ADD COLUMN stock_quantity REAL NOT NULL DEFAULT 0');
+        }
+        if (!columns.contains('minimum_alert_quantity')) {
+          await db.execute('ALTER TABLE raw_materials ADD COLUMN minimum_alert_quantity REAL NOT NULL DEFAULT 0');
+        }
+      } catch (e) {
+        debugPrint('Error adding columns to raw_materials: $e');
+      }
+      
+      // Create raw_material_units table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_material_units (
+          id TEXT PRIMARY KEY,
+          raw_material_id TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          conversion_factor_to_base REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE,
+          UNIQUE(raw_material_id, unit)
+        )
+      ''');
+      
+      // Update recipe_ingredients table
+      try {
+        final result = await db.rawQuery("PRAGMA table_info(recipe_ingredients)");
+        final columns = result.map((row) => row['name'] as String).toSet();
+        
+        if (!columns.contains('quantity_required_in_base_unit')) {
+          // Add new column
+          await db.execute('ALTER TABLE recipe_ingredients ADD COLUMN quantity_required_in_base_unit REAL');
+          // Copy existing quantity values
+          await db.execute('UPDATE recipe_ingredients SET quantity_required_in_base_unit = quantity');
+        }
+      } catch (e) {
+        debugPrint('Error updating recipe_ingredients: $e');
+      }
+      
+      // Create invoices table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS invoices (
+          id TEXT PRIMARY KEY,
+          date TEXT NOT NULL,
+          total_amount REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      
+      // Create invoice_items table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS invoice_items (
+          id TEXT PRIMARY KEY,
+          invoice_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          quantity_sold REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // Create indexes
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_units_raw_material_id ON raw_material_units(raw_material_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON invoice_items(invoice_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_invoice_items_item_id ON invoice_items(item_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_date ON invoices(date)');
+      
+      debugPrint('Restaurant Inventory System tables created');
+    } catch (e) {
+      debugPrint('Error adding restaurant inventory system: $e');
+    }
+  }
+
+  // ============================================
+  // Restaurant Inventory Management Functions
+  // ============================================
+
+  /// Convert quantity from input unit to base unit
+  /// Returns converted quantity in base unit
+  Future<double> convertToBaseUnit(String rawMaterialId, double quantity, String unit) async {
+    final db = await database;
+    
+    // Get raw material
+    final material = await getRawMaterialById(rawMaterialId);
+    if (material == null) {
+      throw Exception('Raw material not found: $rawMaterialId');
+    }
+    
+    // If unit is already base unit, return as is
+    if (unit.toLowerCase() == material.baseUnit.toLowerCase()) {
+      return quantity;
+    }
+    
+    // No special case needed - all materials use standard conversion
+    
+    // Get conversion factor from raw_material_units table
+    final unitMaps = await db.query(
+      'raw_material_units',
+      where: 'raw_material_id = ? AND unit = ?',
+      whereArgs: [rawMaterialId, unit.toLowerCase()],
+      limit: 1,
+    );
+    
+    if (unitMaps.isNotEmpty) {
+      final conversionFactor = (unitMaps.first['conversion_factor_to_base'] as num).toDouble();
+      return quantity * conversionFactor;
+    }
+    
+    // Default conversions for common units
+    final baseUnit = material.baseUnit.toLowerCase();
+    final inputUnit = unit.toLowerCase();
+    
+    // Weight conversions (gram is base)
+    if (baseUnit == 'gram') {
+      if (inputUnit == 'kilogram' || inputUnit == 'kg' || inputUnit == 'كيلو') {
+        return quantity * 1000.0; // 1 kg = 1000 grams
+      }
+      if (inputUnit == 'gram' || inputUnit == 'g' || inputUnit == 'جرام') {
+        return quantity;
+      }
+    }
+    
+    // Volume conversions (ml is base)
+    if (baseUnit == 'ml') {
+      if (inputUnit == 'liter' || inputUnit == 'l' || inputUnit == 'لتر') {
+        return quantity * 1000.0; // 1 L = 1000 ml
+      }
+      if (inputUnit == 'ml' || inputUnit == 'مل') {
+        return quantity;
+      }
+    }
+    
+    // Piece has no conversion (1:1)
+    if (baseUnit == 'piece' && (inputUnit == 'piece' || inputUnit == 'قطعة')) {
+      return quantity;
+    }
+    
+    // Carton conversions (carton is base)
+    if (baseUnit == 'carton') {
+      if (inputUnit == 'carton' || inputUnit == 'كرتونة') {
+        return quantity;
+      }
+      if (inputUnit == 'bottle' || inputUnit == 'زجاجة') {
+        // Use conversion factor from database if available, otherwise default to 20
+        // This will be handled by the raw_material_units table query above
+        // Default: 1 bottle = 1/20 carton
+        return quantity / 20.0;
+      }
+    }
+    
+    // Packet conversions (packet is base, 1 packet = 10kg = 10000g)
+    if (baseUnit == 'packet') {
+      if (inputUnit == 'packet' || inputUnit == 'باكيت') {
+        return quantity;
+      }
+      if (inputUnit == 'kilogram' || inputUnit == 'kg' || inputUnit == 'كيلو') {
+        // 1 packet = 10kg, so 1 kg = 0.1 packet
+        return quantity * 0.1;
+      }
+      if (inputUnit == 'gram' || inputUnit == 'g' || inputUnit == 'جرام') {
+        // 1 packet = 10000g, so 1g = 0.0001 packet
+        return quantity * 0.0001;
+      }
+    }
+    
+    // Jar conversions (jar is base, 1:1)
+    if (baseUnit == 'jar') {
+      if (inputUnit == 'jar' || inputUnit == 'جرة') {
+        return quantity;
+      }
+    }
+    
+    throw Exception('Invalid unit conversion: $unit to $baseUnit');
+  }
+
+  /// Add raw material to stock
+  /// Accepts quantity + unit, converts to base unit, increases stock_quantity
+  Future<void> addRawMaterialStock(String rawMaterialId, double quantity, String unit) async {
+    final db = await database;
+    
+    // Convert to base unit
+    final quantityInBaseUnit = await convertToBaseUnit(rawMaterialId, quantity, unit);
+    
+    // Get current stock
+    final material = await getRawMaterialById(rawMaterialId);
+    if (material == null) {
+      throw Exception('Raw material not found: $rawMaterialId');
+    }
+    
+    // Update stock quantity
+    final newStockQuantity = material.stockQuantity + quantityInBaseUnit;
+    
+    await db.update(
+      'raw_materials',
+      {
+        'stock_quantity': newStockQuantity,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [rawMaterialId],
+    );
+    
+    debugPrint('Added $quantity $unit ($quantityInBaseUnit ${material.baseUnit}) to ${material.name}. New stock: $newStockQuantity');
+  }
+
+  /// Format stock quantity for smart display
+  /// Returns formatted string with the most meaningful unit
+  Future<Map<String, String>> formatStockForDisplay(String rawMaterialId) async {
+    final material = await getRawMaterialById(rawMaterialId);
+    if (material == null) {
+      throw Exception('Raw material not found: $rawMaterialId');
+    }
+
+    final totalQuantity = material.totalQuantity;
+    debugPrint('formatStockForDisplay: ${material.name}, baseUnit: ${material.baseUnit}, totalQuantity: $totalQuantity');
+    String quantityDisplay;
+    String unitDisplay;
+
+    if (material.baseUnit == 'gram') {
+      // Weight-based: show kg if >= 1000g, otherwise grams
+      if (totalQuantity >= 1000) {
+        final kilos = totalQuantity / 1000.0;
+        final remainingGrams = (totalQuantity % 1000).round();
+        if (remainingGrams > 0) {
+          quantityDisplay = '${kilos.toStringAsFixed(0)} كيلو\n$remainingGrams جرام';
+        } else {
+          quantityDisplay = '${kilos.toStringAsFixed(2)} كيلو';
+        }
+        unitDisplay = 'كيلو / جرام';
+      } else {
+        quantityDisplay = totalQuantity.toStringAsFixed(2);
+        unitDisplay = 'جرام';
+      }
+    } else if (material.baseUnit == 'ml') {
+      // Volume-based: show liters if >= 1000ml, otherwise ml
+      if (totalQuantity >= 1000) {
+        final liters = totalQuantity / 1000.0;
+        final remainingMl = (totalQuantity % 1000).round();
+        if (remainingMl > 0) {
+          quantityDisplay = '${liters.toStringAsFixed(0)} لتر\n$remainingMl مل';
+        } else {
+          quantityDisplay = '${liters.toStringAsFixed(2)} لتر';
+        }
+        unitDisplay = 'لتر / مل';
+      } else {
+        quantityDisplay = totalQuantity.toStringAsFixed(2);
+        unitDisplay = 'مل';
+      }
+    } else if (material.baseUnit == 'carton') {
+      // Carton-based: show cartons + remaining bottles
+      unitDisplay = 'كرتونة / زجاجة';
+      
+      if (totalQuantity <= 0) {
+        // Out of stock - still show correct unit
+        quantityDisplay = '0';
+      } else {
+        final units = await getRawMaterialUnits(rawMaterialId);
+        final bottleUnit = units.firstWhere(
+          (u) => u.unit == 'bottle' || u.unit == 'زجاجة',
+          orElse: () => RawMaterialUnit(
+            id: '',
+            rawMaterialId: rawMaterialId,
+            unit: 'bottle',
+            conversionFactorToBase: 1.0 / 20.0,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+        final bottlesPerCarton = (1.0 / bottleUnit.conversionFactorToBase).round();
+        final totalBottles = (totalQuantity * bottlesPerCarton).round();
+        final cartons = (totalBottles / bottlesPerCarton).floor();
+        final remainingBottles = totalBottles % bottlesPerCarton;
+
+        if (cartons > 0 && remainingBottles > 0) {
+          quantityDisplay = '$cartons كرتونة ($bottlesPerCarton)\n+ $remainingBottles زجاجة';
+        } else if (cartons > 0) {
+          quantityDisplay = '$cartons كرتونة ($bottlesPerCarton)';
+        } else if (totalBottles > 0) {
+          quantityDisplay = '$totalBottles زجاجة';
+        } else {
+          quantityDisplay = '0';
+        }
+      }
+    } else if (material.baseUnit == 'packet') {
+      // Packet-based: totalQuantity is in packets (base unit)
+      // 1 packet = 10kg = 10000g
+      final totalPackets = totalQuantity;
+      final wholePackets = totalPackets.floor();
+      final fractionalPackets = totalPackets - wholePackets;
+      final remainingKg = fractionalPackets * 10.0; // 1 packet = 10kg
+
+      if (wholePackets > 0 && remainingKg > 0.01) {
+        quantityDisplay = '$wholePackets باكيت\n+ ${remainingKg.toStringAsFixed(2)} كيلو';
+      } else if (wholePackets > 0) {
+        quantityDisplay = '$wholePackets باكيت';
+      } else if (remainingKg > 0.01) {
+        quantityDisplay = '${remainingKg.toStringAsFixed(2)} كيلو';
+      } else {
+        quantityDisplay = '0';
+      }
+      unitDisplay = 'باكيت / كيلو';
+    } else if (material.baseUnit == 'jar') {
+      // Jar-based: show strictly as jars
+      quantityDisplay = totalQuantity.toStringAsFixed(0);
+      unitDisplay = 'جرة';
+    } else if (material.baseUnit == 'piece') {
+      // Piece-based
+      quantityDisplay = totalQuantity.toStringAsFixed(0);
+      unitDisplay = 'قطعة';
+    } else {
+      // Default
+      quantityDisplay = totalQuantity.toStringAsFixed(2);
+      unitDisplay = material.baseUnit;
+    }
+
+    return {
+      'quantity': quantityDisplay,
+      'unit': unitDisplay,
+    };
+  }
+
+  /// Calculate and deduct stock for invoice items
+  /// Returns list of low stock warnings
+  Future<List<String>> calculateAndDeductStock(List<Map<String, dynamic>> invoiceItems) async {
+    final db = await database;
+    final warnings = <String>[];
+    
+    // First, validate all stock is sufficient
+    for (var invoiceItem in invoiceItems) {
+      final itemId = invoiceItem['item_id'] as String;
+      final quantitySold = (invoiceItem['quantity_sold'] as num).toDouble();
+      
+      // Get recipe for this item
+      final recipe = await getRecipeByItemId(itemId);
+      if (recipe == null) {
+        continue; // Item has no recipe, skip
+      }
+      
+      // For each ingredient in recipe
+      for (var ingredient in recipe.ingredients) {
+        final rawMaterialId = ingredient.rawMaterialId;
+        final quantityRequiredPerItem = ingredient.quantityRequiredInBaseUnit;
+        final totalQuantityRequired = quantityRequiredPerItem * quantitySold;
+        
+        // Get current stock
+        final material = await getRawMaterialById(rawMaterialId);
+        if (material == null) {
+          throw Exception('Raw material not found: $rawMaterialId');
+        }
+        
+        // Check if stock is sufficient
+        if (material.stockQuantity < totalQuantityRequired) {
+          throw Exception(
+            'Insufficient stock for ${material.name}. '
+            'Required: $totalQuantityRequired ${material.baseUnit}, '
+            'Available: ${material.stockQuantity} ${material.baseUnit}'
+          );
+        }
+      }
+    }
+    
+    // All stock validated, now deduct
+    for (var invoiceItem in invoiceItems) {
+      final itemId = invoiceItem['item_id'] as String;
+      final quantitySold = (invoiceItem['quantity_sold'] as num).toDouble();
+      
+      // Get recipe for this item
+      final recipe = await getRecipeByItemId(itemId);
+      if (recipe == null) {
+        continue; // Item has no recipe, skip
+      }
+      
+      // For each ingredient in recipe
+      for (var ingredient in recipe.ingredients) {
+        final rawMaterialId = ingredient.rawMaterialId;
+        final quantityRequiredPerItem = ingredient.quantityRequiredInBaseUnit;
+        final totalQuantityRequired = quantityRequiredPerItem * quantitySold;
+        
+        // Get current stock
+        final material = await getRawMaterialById(rawMaterialId);
+        if (material == null) {
+          continue;
+        }
+        
+        // Deduct from stock
+        final newStockQuantity = material.stockQuantity - totalQuantityRequired;
+        
+        await db.update(
+          'raw_materials',
+          {
+            'stock_quantity': newStockQuantity,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [rawMaterialId],
+        );
+        
+        // Check for low stock alert
+        if (newStockQuantity <= material.minimumAlertQuantity) {
+          warnings.add('⚠️ Raw material ${material.name} is running low. '
+                      'Current: $newStockQuantity ${material.baseUnit}, '
+                      'Minimum: ${material.minimumAlertQuantity} ${material.baseUnit}');
+        }
+      }
+    }
+    
+    return warnings;
+  }
+
+  /// Create invoice and process stock deduction
+  /// Returns invoice ID and list of warnings
+  Future<Map<String, dynamic>> createInvoice({
+    required DateTime date,
+    required double totalAmount,
+    required List<Map<String, dynamic>> invoiceItems,
+  }) async {
+    final db = await database;
+    final uuid = const Uuid();
+    final now = DateTime.now();
+    
+    // Validate and deduct stock
+    final warnings = await calculateAndDeductStock(invoiceItems);
+    
+    // Create invoice
+    final invoiceId = uuid.v4();
+    await db.insert('invoices', {
+      'id': invoiceId,
+      'date': date.toIso8601String(),
+      'total_amount': totalAmount,
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    });
+    
+    // Create invoice items
+    for (var item in invoiceItems) {
+      await db.insert('invoice_items', {
+        'id': uuid.v4(),
+        'invoice_id': invoiceId,
+        'item_id': item['item_id'] as String,
+        'quantity_sold': item['quantity_sold'] as num,
+        'created_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      });
+    }
+    
+    return {
+      'invoice_id': invoiceId,
+      'warnings': warnings,
+    };
+  }
+
+  // Raw Material Units CRUD
+  Future<void> insertRawMaterialUnit(RawMaterialUnit unit) async {
+    final db = await database;
+    await db.insert(
+      'raw_material_units',
+      unit.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<RawMaterialUnit>> getRawMaterialUnits(String rawMaterialId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'raw_material_units',
+      where: 'raw_material_id = ?',
+      whereArgs: [rawMaterialId],
+    );
+    return maps.map((map) => RawMaterialUnit.fromMap(map)).toList();
+  }
+
+  // Invoices CRUD
+  Future<void> insertInvoice(Invoice invoice) async {
+    final db = await database;
+    await db.insert(
+      'invoices',
+      invoice.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Invoice>> getAllInvoices() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'invoices',
+      orderBy: 'date DESC',
+    );
+    final invoices = <Invoice>[];
+    
+    for (var map in maps) {
+      final invoice = Invoice.fromMap(map);
+      final items = await getInvoiceItemsByInvoiceId(invoice.id);
+      invoices.add(invoice.copyWith(items: items));
+    }
+    
+    return invoices;
+  }
+
+  Future<List<InvoiceItem>> getInvoiceItemsByInvoiceId(String invoiceId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'invoice_items',
+      where: 'invoice_id = ?',
+      whereArgs: [invoiceId],
+    );
+    return maps.map((map) => InvoiceItem.fromMap(map)).toList();
   }
 
   // Close database
