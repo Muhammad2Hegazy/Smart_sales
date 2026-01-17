@@ -19,15 +19,20 @@ class UserPermission {
     required this.updatedAt,
   });
 
-  /// Create from Map (Supabase response)
+  /// Create from Map (Database response)
   factory UserPermission.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic value) {
+      if (value == null || value.toString().isEmpty) return DateTime.now();
+      return DateTime.tryParse(value.toString()) ?? DateTime.now();
+    }
+
     return UserPermission(
-      id: map['id'] as String,
-      userId: map['user_id'] as String,
-      permissionKey: map['permission_key'] as String,
-      allowed: map['allowed'] as bool,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      id: (map['id'] ?? '') as String,
+      userId: (map['user_id'] ?? '') as String,
+      permissionKey: (map['permission_key'] ?? '') as String,
+      allowed: (map['allowed'] == 1 || map['allowed'] == true),
+      createdAt: parseDate(map['created_at']),
+      updatedAt: parseDate(map['updated_at'] ?? map['created_at']),
     );
   }
 
@@ -70,7 +75,7 @@ class UserPermission {
 
 /// Permission Keys Constants
 /// Based on the comprehensive permission system with modules
-/// 
+///
 /// Note: This class requires AppLocalizations for localized labels.
 /// Use getLabel() and getModuleLabel() methods with AppLocalizations instance.
 class PermissionKeys {
@@ -78,27 +83,31 @@ class PermissionKeys {
   static const String viewReports = 'view_reports';
   // Permissions Module
   static const String userPermissions = 'user_permissions';
-  
+
   // Basic Data Module
   static const String basicData = 'basic_data';
   static const String addEditItemsProducts = 'add_edit_items_products';
   static const String registerOpeningBalance = 'register_opening_balance';
-  static const String retrieveEditOpeningBalance = 'retrieve_edit_opening_balance';
-  
+  static const String retrieveEditOpeningBalance =
+      'retrieve_edit_opening_balance';
+
   // Inventory Module
-  static const String registerTransfersToWarehouses = 'register_transfers_to_warehouses';
-  static const String registerTransfersFromWarehouses = 'register_transfers_from_warehouses';
+  static const String registerTransfersToWarehouses =
+      'register_transfers_to_warehouses';
+  static const String registerTransfersFromWarehouses =
+      'register_transfers_from_warehouses';
   static const String printBarcode = 'print_barcode';
-  
+
   // Purchases Module
   static const String registerPurchaseInvoice = 'register_purchase_invoice';
-  static const String retrieveEditPurchaseInvoice = 'retrieve_edit_purchase_invoice';
+  static const String retrieveEditPurchaseInvoice =
+      'retrieve_edit_purchase_invoice';
   static const String registerPurchaseReturns = 'register_purchase_returns';
-  
+
   // Vendors/Sellers Module
   static const String addVendors = 'add_vendors';
   static const String adjustSalePrice = 'adjust_sale_price';
-  
+
   // Sales Invoice Module
   static const String registerSalesInvoice = 'register_sales_invoice';
   static const String clearAllCurrentInvoice = 'clear_all_current_invoice';
@@ -109,35 +118,37 @@ class PermissionKeys {
   static const String temporaryPrintBeforeSave = 'temporary_print_before_save';
   static const String inquireTreasuryBalance = 'inquire_treasury_balance';
   static const String retrieveEditSalesInvoice = 'retrieve_edit_sales_invoice';
-  
+
   // Sales Returns Module
   static const String registerSalesReturns = 'register_sales_returns';
-  
+
   // Accounts Module
   static const String addNewAccount = 'add_new_account';
   static const String registerCashReceipt = 'register_cash_receipt';
   static const String registerCashDisbursement = 'register_cash_disbursement';
   static const String registerAdjustmentEntries = 'register_adjustment_entries';
-  
+
   // Inventory Reports Module
   static const String inventoryCountReport = 'inventory_count_report';
-  static const String inventoryCountReportByCategory = 'inventory_count_report_by_category';
+  static const String inventoryCountReportByCategory =
+      'inventory_count_report_by_category';
   static const String inventoryMovementReport = 'inventory_movement_report';
   static const String itemMovementReport = 'item_movement_report';
   static const String itemMovementReportByItem = 'item_movement_report_by_item';
-  
+
   // Purchase Reports Module
   static const String purchaseReportByVendor = 'purchase_report_by_vendor';
-  
+
   // Sales Reports Module
   static const String shiftPreferenceReport = 'shift_preference_report';
   static const String dailySalesReport = 'daily_sales_report';
-  static const String aggregatedSalesReportByItems = 'aggregated_sales_report_by_items';
+  static const String aggregatedSalesReportByItems =
+      'aggregated_sales_report_by_items';
   static const String salesReportByItem = 'sales_report_by_item';
   static const String salesReportByCategory = 'sales_report_by_category';
   static const String salesReportByCustomer = 'sales_report_by_customer';
   static const String customerAccountStatement = 'customer_account_statement';
-  
+
   // Account Reports Module
   static const String supplierAccountStatement = 'supplier_account_statement';
   static const String customerBalancesReport = 'customer_balances_report';
@@ -167,7 +178,8 @@ class PermissionKeys {
   static const String posProcessPayment = 'pos_process_payment';
   static const String posPrintInvoice = 'pos_print_invoice';
   static const String posSelectTable = 'pos_select_table';
-  static const String posAccessHospitalityTable = 'pos_access_hospitality_table';
+  static const String posAccessHospitalityTable =
+      'pos_access_hospitality_table';
   static const String posClearCart = 'pos_clear_cart';
   static const String posViewCart = 'pos_view_cart';
 
@@ -176,11 +188,13 @@ class PermissionKeys {
   static const String financialAddCashOut = 'financial_add_cash_out';
   static const String financialViewProfitLoss = 'financial_view_profit_loss';
   static const String financialViewTransactions = 'financial_view_transactions';
-  static const String financialCalculateProfitLoss = 'financial_calculate_profit_loss';
+  static const String financialCalculateProfitLoss =
+      'financial_calculate_profit_loss';
 
   // Reports Features
   static const String reportsViewSalesReport = 'reports_view_sales_report';
-  static const String reportsViewFinancialReport = 'reports_view_financial_report';
+  static const String reportsViewFinancialReport =
+      'reports_view_financial_report';
   static const String reportsExportReports = 'reports_export_reports';
   static const String reportsViewDailyReport = 'reports_view_daily_report';
   static const String reportsViewWeeklyReport = 'reports_view_weekly_report';
@@ -202,137 +216,137 @@ class PermissionKeys {
 
   /// Get all available permission keys
   static List<String> get all => [
-        // General permissions
-        viewReports,
-        // Permissions
-        userPermissions,
-        // Main Screens Access
-        accessPosScreen,
-        accessInventoryScreen,
-        accessItemsScreen,
-        accessReportsScreen,
-        accessFinancialScreen,
-        accessSettingsScreen,
-        // Settings Tabs
-        accessGeneralSettings,
-        accessUserManagement,
-        accessDeviceManagement,
-        accessSyncSettings,
-        accessSystemSettings,
-        // POS Features
-        posApplyDiscount,
-        posProcessPayment,
-        posPrintInvoice,
-        posSelectTable,
-        posAccessHospitalityTable,
-        posClearCart,
-        posViewCart,
-        // Financial Features
-        financialAddCashIn,
-        financialAddCashOut,
-        financialViewProfitLoss,
-        financialViewTransactions,
-        financialCalculateProfitLoss,
-        // Reports Features
-        reportsViewSalesReport,
-        reportsViewFinancialReport,
-        reportsExportReports,
-        reportsViewDailyReport,
-        reportsViewWeeklyReport,
-        reportsViewMonthlyReport,
-        reportsViewYearlyReport,
-        // Settings Features
-        settingsCreateUser,
-        settingsEditUser,
-        settingsDeleteUser,
-        settingsChangePassword,
-        settingsManagePermissions,
-        settingsBackupRestore,
-        settingsClearData,
-        settingsImportData,
-        settingsExportData,
-        settingsConfigureTax,
-        settingsConfigurePrinter,
-        // Basic Data
-        basicData,
-        addEditItemsProducts,
-        registerOpeningBalance,
-        retrieveEditOpeningBalance,
-        // Inventory
-        registerTransfersToWarehouses,
-        registerTransfersFromWarehouses,
-        printBarcode,
-        // Purchases
-        registerPurchaseInvoice,
-        retrieveEditPurchaseInvoice,
-        registerPurchaseReturns,
-        // Vendors
-        addVendors,
-        adjustSalePrice,
-        // Sales Invoice
-        registerSalesInvoice,
-        clearAllCurrentInvoice,
-        clearItemCurrentInvoice,
-        changeItemCurrentInvoice,
-        changeItemQuantityLess,
-        discountInvoiceItems,
-        temporaryPrintBeforeSave,
-        inquireTreasuryBalance,
-        retrieveEditSalesInvoice,
-        // Sales Returns
-        registerSalesReturns,
-        // Accounts
-        addNewAccount,
-        registerCashReceipt,
-        registerCashDisbursement,
-        registerAdjustmentEntries,
-        // Inventory Reports
-        inventoryCountReport,
-        inventoryCountReportByCategory,
-        inventoryMovementReport,
-        itemMovementReport,
-        itemMovementReportByItem,
-        // Purchase Reports
-        purchaseReportByVendor,
-        // Sales Reports
-        shiftPreferenceReport,
-        dailySalesReport,
-        aggregatedSalesReportByItems,
-        salesReportByItem,
-        salesReportByCategory,
-        salesReportByCustomer,
-        customerAccountStatement,
-        // Account Reports
-        supplierAccountStatement,
-        customerBalancesReport,
-        supplierBalancesReport,
-        generalLedgerReport,
-        accountBalancesReport,
-        profitReportForPeriod,
-        incomeStatementReport,
-      ];
+    // General permissions
+    viewReports,
+    // Permissions
+    userPermissions,
+    // Main Screens Access
+    accessPosScreen,
+    accessInventoryScreen,
+    accessItemsScreen,
+    accessReportsScreen,
+    accessFinancialScreen,
+    accessSettingsScreen,
+    // Settings Tabs
+    accessGeneralSettings,
+    accessUserManagement,
+    accessDeviceManagement,
+    accessSyncSettings,
+    accessSystemSettings,
+    // POS Features
+    posApplyDiscount,
+    posProcessPayment,
+    posPrintInvoice,
+    posSelectTable,
+    posAccessHospitalityTable,
+    posClearCart,
+    posViewCart,
+    // Financial Features
+    financialAddCashIn,
+    financialAddCashOut,
+    financialViewProfitLoss,
+    financialViewTransactions,
+    financialCalculateProfitLoss,
+    // Reports Features
+    reportsViewSalesReport,
+    reportsViewFinancialReport,
+    reportsExportReports,
+    reportsViewDailyReport,
+    reportsViewWeeklyReport,
+    reportsViewMonthlyReport,
+    reportsViewYearlyReport,
+    // Settings Features
+    settingsCreateUser,
+    settingsEditUser,
+    settingsDeleteUser,
+    settingsChangePassword,
+    settingsManagePermissions,
+    settingsBackupRestore,
+    settingsClearData,
+    settingsImportData,
+    settingsExportData,
+    settingsConfigureTax,
+    settingsConfigurePrinter,
+    // Basic Data
+    basicData,
+    addEditItemsProducts,
+    registerOpeningBalance,
+    retrieveEditOpeningBalance,
+    // Inventory
+    registerTransfersToWarehouses,
+    registerTransfersFromWarehouses,
+    printBarcode,
+    // Purchases
+    registerPurchaseInvoice,
+    retrieveEditPurchaseInvoice,
+    registerPurchaseReturns,
+    // Vendors
+    addVendors,
+    adjustSalePrice,
+    // Sales Invoice
+    registerSalesInvoice,
+    clearAllCurrentInvoice,
+    clearItemCurrentInvoice,
+    changeItemCurrentInvoice,
+    changeItemQuantityLess,
+    discountInvoiceItems,
+    temporaryPrintBeforeSave,
+    inquireTreasuryBalance,
+    retrieveEditSalesInvoice,
+    // Sales Returns
+    registerSalesReturns,
+    // Accounts
+    addNewAccount,
+    registerCashReceipt,
+    registerCashDisbursement,
+    registerAdjustmentEntries,
+    // Inventory Reports
+    inventoryCountReport,
+    inventoryCountReportByCategory,
+    inventoryMovementReport,
+    itemMovementReport,
+    itemMovementReportByItem,
+    // Purchase Reports
+    purchaseReportByVendor,
+    // Sales Reports
+    shiftPreferenceReport,
+    dailySalesReport,
+    aggregatedSalesReportByItems,
+    salesReportByItem,
+    salesReportByCategory,
+    salesReportByCustomer,
+    customerAccountStatement,
+    // Account Reports
+    supplierAccountStatement,
+    customerBalancesReport,
+    supplierBalancesReport,
+    generalLedgerReport,
+    accountBalancesReport,
+    profitReportForPeriod,
+    incomeStatementReport,
+  ];
 
   /// Get all modules
   static List<String> getModules() => [
-        'main_screens',
-        'settings_tabs',
-        'pos_features',
-        'financial_features',
-        'reports_features',
-        'settings_features',
-        'permissions',
-        'basic_data',
-        'inventory',
-        'purchases',
-        'vendors',
-        'sales_invoice',
-        'sales_returns',
-        'accounts',
-        'inventory_reports',
-        'purchase_reports',
-        'sales_reports',
-        'account_reports',
-      ];
+    'main_screens',
+    'settings_tabs',
+    'pos_features',
+    'financial_features',
+    'reports_features',
+    'settings_features',
+    'permissions',
+    'basic_data',
+    'inventory',
+    'purchases',
+    'vendors',
+    'sales_invoice',
+    'sales_returns',
+    'accounts',
+    'inventory_reports',
+    'purchase_reports',
+    'sales_reports',
+    'account_reports',
+  ];
 
   /// Get permissions by module
   static List<String> getPermissionsByModule(String module) {
@@ -722,10 +736,10 @@ class PermissionKeys {
         return l10n.permissionViewReports;
       default:
         // Fallback: format the key
-        return key.split('_').map((word) => 
-          word[0].toUpperCase() + word.substring(1)
-        ).join(' ');
+        return key
+            .split('_')
+            .map((word) => word[0].toUpperCase() + word.substring(1))
+            .join(' ');
     }
   }
 }
-

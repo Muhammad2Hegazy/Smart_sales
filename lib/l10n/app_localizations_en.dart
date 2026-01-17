@@ -290,6 +290,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importNotes => 'Import Notes';
 
   @override
+  String get importAllWithJson => 'Import All via JSON';
+
+  @override
   String get importFromExcel => 'Import from Excel';
 
   @override
@@ -312,6 +315,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectTable => 'Select Table';
+
+  @override
+  String get selectedTables => 'Selected Tables';
 
   @override
   String get reports => 'Reports';

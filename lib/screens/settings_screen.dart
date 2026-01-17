@@ -11,7 +11,7 @@ import '../core/widgets/app_button.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/constants/app_constants.dart';
 import '../core/utils/locale_helper.dart';
-import '../core/utils/excel_importer.dart';
+import '../core/utils/csv_importer.dart';
 import '../core/utils/printer_settings_helper.dart';
 import '../core/models/printer_settings.dart';
 import '../core/utils/tax_settings_helper.dart';
@@ -90,17 +90,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     return BlocBuilder<UserManagementBloc, UserManagementState>(
       builder: (context, userMgmtState) {
-        final isAdmin = userMgmtState is UserManagementLoaded && userMgmtState.isAdmin;
-        
+        final isAdmin =
+            userMgmtState is UserManagementLoaded && userMgmtState.isAdmin;
+
         return DefaultTabController(
           length: isAdmin ? 5 : 4, // Add User Management tab for admin
           child: Scaffold(
@@ -110,11 +109,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               bottom: TabBar(
                 isScrollable: true,
                 tabs: [
-                  Tab(text: l10n.generalSettings, icon: const Icon(Icons.settings_outlined)),
-                  if (isAdmin) Tab(text: l10n.userManagement, icon: const Icon(Icons.people_outlined)),
-                  Tab(text: l10n.devices, icon: const Icon(Icons.devices_outlined)),
+                  Tab(
+                    text: l10n.generalSettings,
+                    icon: const Icon(Icons.settings_outlined),
+                  ),
+                  if (isAdmin)
+                    Tab(
+                      text: l10n.userManagement,
+                      icon: const Icon(Icons.people_outlined),
+                    ),
+                  Tab(
+                    text: l10n.devices,
+                    icon: const Icon(Icons.devices_outlined),
+                  ),
                   Tab(text: l10n.sync, icon: const Icon(Icons.sync_outlined)),
-                  Tab(text: l10n.systemSettings, icon: const Icon(Icons.info_outlined)),
+                  Tab(
+                    text: l10n.systemSettings,
+                    icon: const Icon(Icons.info_outlined),
+                  ),
                 ],
               ),
             ),
@@ -151,7 +163,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           final profile = snapshot.data!;
                           return ListTile(
                             leading: Icon(
-                              profile.isAdmin ? Icons.admin_panel_settings : Icons.person,
+                              profile.isAdmin
+                                  ? Icons.admin_panel_settings
+                                  : Icons.person,
                               color: AppColors.primary,
                             ),
                             title: Text(profile.username),
@@ -159,7 +173,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           );
                         }
                         return ListTile(
-                          leading: const Icon(Icons.person, color: AppColors.primary),
+                          leading: const Icon(
+                            Icons.person,
+                            color: AppColors.primary,
+                          ),
                           title: Text(authState.user.email),
                           subtitle: Text(l10n.loadingProfile),
                         );
@@ -176,73 +193,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 );
               } else {
-                return ListTile(
-                  title: Text(l10n.notAuthenticated),
-                );
+                return ListTile(title: Text(l10n.notAuthenticated));
               }
             },
           ),
         ]),
         const SizedBox(height: AppSpacing.lg),
         _buildSectionHeader(l10n.generalSettings),
-          _buildSettingsCard([
-            _buildSwitchTile(
-              l10n.enableNotifications,
-              l10n.notificationsDescription,
-              _notificationsEnabled,
-              (value) => setState(() => _notificationsEnabled = value),
-              Icons.notifications_outlined,
-            ),
-            _buildDivider(),
-            _buildSwitchTile(
-              l10n.soundEffects,
-              l10n.soundDescription,
-              _soundEnabled,
-              (value) => setState(() => _soundEnabled = value),
-              Icons.volume_up_outlined,
-            ),
-            _buildDivider(),
-            _buildSwitchTile(
-              l10n.autoPrintReceipts,
-              l10n.autoPrintDescription,
-              _autoPrintEnabled,
-              (value) => setState(() => _autoPrintEnabled = value),
-              Icons.print_outlined,
-            ),
-          ]),
-          const SizedBox(height: AppSpacing.lg),
+        _buildSettingsCard([
+          _buildSwitchTile(
+            l10n.enableNotifications,
+            l10n.notificationsDescription,
+            _notificationsEnabled,
+            (value) => setState(() => _notificationsEnabled = value),
+            Icons.notifications_outlined,
+          ),
+          _buildDivider(),
+          _buildSwitchTile(
+            l10n.soundEffects,
+            l10n.soundDescription,
+            _soundEnabled,
+            (value) => setState(() => _soundEnabled = value),
+            Icons.volume_up_outlined,
+          ),
+          _buildDivider(),
+          _buildSwitchTile(
+            l10n.autoPrintReceipts,
+            l10n.autoPrintDescription,
+            _autoPrintEnabled,
+            (value) => setState(() => _autoPrintEnabled = value),
+            Icons.print_outlined,
+          ),
+        ]),
+        const SizedBox(height: AppSpacing.lg),
         _buildSectionHeader(l10n.appearance),
-          _buildSettingsCard([
-            _buildLanguageDropdown(l10n),
-            _buildDivider(),
-            _buildThemeDropdown(l10n),
-          ]),
-          const SizedBox(height: AppSpacing.lg),
+        _buildSettingsCard([
+          _buildLanguageDropdown(l10n),
+          _buildDivider(),
+          _buildThemeDropdown(l10n),
+        ]),
+        const SizedBox(height: AppSpacing.lg),
         _buildSectionHeader(l10n.businessSettings),
-          _buildSettingsCard([
-            _buildDropdownTile(
-              l10n.currency,
-              _selectedCurrency,
-              [AppConstants.currency],
-              (value) => setState(() => _selectedCurrency = value!),
-              Icons.attach_money_outlined,
-            ),
-            _buildDivider(),
-            _buildListTile(
-              l10n.taxSettings,
-              l10n.taxDescription,
-              Icons.receipt_long_outlined,
-              () => _showTaxSettings(context, l10n),
-            ),
-            _buildDivider(),
-            _buildListTile(
-              l10n.printerSettings,
-              l10n.receiptDescription,
-              Icons.print_outlined,
-              () => _showPrinterSettings(context, l10n),
-            ),
-          ]),
-          const SizedBox(height: AppSpacing.lg),
+        _buildSettingsCard([
+          _buildDropdownTile(
+            l10n.currency,
+            _selectedCurrency,
+            [AppConstants.currency],
+            (value) => setState(() => _selectedCurrency = value!),
+            Icons.attach_money_outlined,
+          ),
+          _buildDivider(),
+          _buildListTile(
+            l10n.taxSettings,
+            l10n.taxDescription,
+            Icons.receipt_long_outlined,
+            () => _showTaxSettings(context, l10n),
+          ),
+          _buildDivider(),
+          _buildListTile(
+            l10n.printerSettings,
+            l10n.receiptDescription,
+            Icons.print_outlined,
+            () => _showPrinterSettings(context, l10n),
+          ),
+        ]),
+        const SizedBox(height: AppSpacing.lg),
         _buildSectionHeader(l10n.dataImport),
         _buildSettingsCard([
           _buildListTile(
@@ -263,11 +278,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context.read<UserManagementBloc>().add(const LoadUsers());
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (state is UserManagementError) {
           return Center(child: Text('Error: ${state.message}'));
         }
-        
+
         if (state is UserManagementLoaded) {
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -285,17 +300,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSectionHeader(l10n.users),
               _buildSettingsCard([
                 if (state.users.isEmpty)
-                  ListTile(
-                    title: Text(l10n.noUsersFound),
-                  )
+                  ListTile(title: Text(l10n.noUsersFound))
                 else
                   ...state.users.map((user) {
-                    final userPermissions = state.userPermissions[user.userId] ?? [];
+                    final userPermissions =
+                        state.userPermissions[user.userId] ?? [];
                     return Column(
                       children: [
                         ListTile(
                           leading: Icon(
-                            user.isAdmin ? Icons.admin_panel_settings : Icons.person,
+                            user.isAdmin
+                                ? Icons.admin_panel_settings
+                                : Icons.person,
                             color: AppColors.primary,
                           ),
                           title: Text(user.username),
@@ -304,20 +320,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.lock_reset, color: AppColors.primary),
+                                icon: const Icon(
+                                  Icons.lock_reset,
+                                  color: AppColors.primary,
+                                ),
                                 tooltip: l10n.changePassword,
-                                onPressed: () => _showChangePasswordDialog(context, user),
+                                onPressed: () =>
+                                    _showChangePasswordDialog(context, user),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.security, color: AppColors.primary),
+                                icon: const Icon(
+                                  Icons.security,
+                                  color: AppColors.primary,
+                                ),
                                 tooltip: l10n.managePermissions,
-                                onPressed: () => _showPermissionsDialog(context, user, userPermissions),
+                                onPressed: () => _showPermissionsDialog(
+                                  context,
+                                  user,
+                                  userPermissions,
+                                ),
                               ),
                               if (!user.isAdmin)
                                 IconButton(
-                                  icon: const Icon(Icons.admin_panel_settings, color: AppColors.primary),
+                                  icon: const Icon(
+                                    Icons.admin_panel_settings,
+                                    color: AppColors.primary,
+                                  ),
                                   tooltip: l10n.promoteToAdmin,
-                                  onPressed: () => _showPromoteToAdminDialog(context, user, l10n),
+                                  onPressed: () => _showPromoteToAdminDialog(
+                                    context,
+                                    user,
+                                    l10n,
+                                  ),
                                 ),
                             ],
                           ),
@@ -330,18 +364,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           );
         }
-        
+
         return Center(child: Text(l10n.unknownState));
       },
     );
   }
 
-  Widget _buildDeviceManagementTab(BuildContext context, AppLocalizations l10n) {
+  Widget _buildDeviceManagementTab(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
     return BlocListener<DeviceBloc, DeviceState>(
       listener: (context, deviceState) {
         // Check if current device was deleted (currentDevice is null but devices list exists)
-        if (deviceState is DeviceReady && 
-            deviceState.currentDevice == null && 
+        if (deviceState is DeviceReady &&
+            deviceState.currentDevice == null &&
             deviceState.devices.isNotEmpty) {
           // Current device was deleted - logout user
           context.read<AuthBloc>().add(const AuthSignOutRequested());
@@ -361,57 +398,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSettingsCard([
             BlocBuilder<DeviceBloc, DeviceState>(
               builder: (context, deviceState) {
-              if (deviceState is DeviceReady) {
-                return Column(
-                  children: [
-                    _buildListTile(
-                      l10n.addDevice,
-                      l10n.addDevice,
-                      Icons.add_circle_outline,
-                      () => _showAddDeviceDialog(context, deviceState.master, l10n),
-                    ),
-                    _buildDivider(),
-                    _buildListTile(
-                      l10n.manageDeviceFloors,
-                      l10n.manageDeviceFloorsDescription,
-                      Icons.layers,
-                      () => _showManageFloorsDialog(context, deviceState.master, deviceState.devices, l10n),
-                    ),
-                    if (deviceState.devices.length > 1) ...[
+                if (deviceState is DeviceReady) {
+                  return Column(
+                    children: [
+                      _buildListTile(
+                        l10n.addDevice,
+                        l10n.addDevice,
+                        Icons.add_circle_outline,
+                        () => _showAddDeviceDialog(
+                          context,
+                          deviceState.master,
+                          l10n,
+                        ),
+                      ),
                       _buildDivider(),
                       _buildListTile(
-                        l10n.deleteAllDevices,
-                        l10n.deleteAllDevicesDescription,
-                        Icons.delete_sweep_outlined,
-                        () => _showDeleteAllDevicesDialog(context, deviceState.master, deviceState.currentDevice, l10n),
-                        isDanger: true,
+                        l10n.manageDeviceFloors,
+                        l10n.manageDeviceFloorsDescription,
+                        Icons.layers,
+                        () => _showManageFloorsDialog(
+                          context,
+                          deviceState.master,
+                          deviceState.devices,
+                          l10n,
+                        ),
                       ),
+                      if (deviceState.devices.length > 1) ...[
+                        _buildDivider(),
+                        _buildListTile(
+                          l10n.deleteAllDevices,
+                          l10n.deleteAllDevicesDescription,
+                          Icons.delete_sweep_outlined,
+                          () => _showDeleteAllDevicesDialog(
+                            context,
+                            deviceState.master,
+                            deviceState.currentDevice,
+                            l10n,
+                          ),
+                          isDanger: true,
+                        ),
+                      ],
+                      if (deviceState.devices.isNotEmpty) _buildDivider(),
+                      if (deviceState.devices.isNotEmpty)
+                        ...deviceState.devices.map(
+                          (device) => Column(
+                            children: [
+                              _buildDeviceTile(
+                                context,
+                                device,
+                                deviceState.currentDevice?.deviceId ==
+                                    device.deviceId,
+                                deviceState.master,
+                                l10n,
+                              ),
+                              if (device != deviceState.devices.last)
+                                _buildDivider(),
+                            ],
+                          ),
+                        ),
                     ],
-                    if (deviceState.devices.isNotEmpty) _buildDivider(),
-                    if (deviceState.devices.isNotEmpty)
-                      ...deviceState.devices.map((device) => Column(
-                        children: [
-                          _buildDeviceTile(context, device, deviceState.currentDevice?.deviceId == device.deviceId, deviceState.master, l10n),
-                          if (device != deviceState.devices.last) _buildDivider(),
-                        ],
-                      )),
-                  ],
-                );
-              } else if (deviceState is DeviceError) {
-                return ListTile(
-                  title: Text('Error: ${deviceState.message}'),
-                  leading: const Icon(Icons.error_outline, color: AppColors.error),
-                );
-              } else {
-                return ListTile(
-                  title: Text(l10n.loadingDevices),
-                  leading: const CircularProgressIndicator(),
-                );
-              }
-            },
-          ),
-        ]),
-      ],
+                  );
+                } else if (deviceState is DeviceError) {
+                  return ListTile(
+                    title: Text('Error: ${deviceState.message}'),
+                    leading: const Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                    ),
+                  );
+                } else {
+                  return ListTile(
+                    title: Text(l10n.loadingDevices),
+                    leading: const CircularProgressIndicator(),
+                  );
+                }
+              },
+            ),
+          ]),
+        ],
       ),
     );
   }
@@ -439,9 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       );
                     } else {
-                      return ListTile(
-                        title: Text(l10n.syncStatusUnavailable),
-                      );
+                      return ListTile(title: Text(l10n.syncStatusUnavailable));
                     }
                   },
                 );
@@ -449,7 +511,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 return ListTile(
                   title: Text(l10n.syncServiceNotAvailable),
                   subtitle: Text(l10n.syncRequiresSupabase),
-                  leading: const Icon(Icons.info_outline, color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.info_outline,
+                    color: AppColors.primary,
+                  ),
                 );
               }
             },
@@ -496,7 +561,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md, left: AppSpacing.xs),
+      padding: const EdgeInsets.only(
+        bottom: AppSpacing.md,
+        left: AppSpacing.xs,
+      ),
       child: Text(
         title,
         style: AppTextStyles.titleLarge.copyWith(
@@ -547,10 +615,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         value: value,
         underline: const SizedBox(),
         items: options.map((option) {
-          return DropdownMenuItem(
-            value: option,
-            child: Text(option),
-          );
+          return DropdownMenuItem(value: option, child: Text(option));
         }).toList(),
         onChanged: onChanged,
       ),
@@ -631,9 +696,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       title: Text(
         title,
-        style: TextStyle(
-          color: isDanger ? AppColors.error : null,
-        ),
+        style: TextStyle(color: isDanger ? AppColors.error : null),
       ),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
@@ -646,10 +709,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showTaxSettings(BuildContext context, AppLocalizations l10n) async {
-    final currentServiceChargeRate = await TaxSettingsHelper.loadServiceChargeRate();
-    final currentDeliveryTaxRate = await TaxSettingsHelper.loadDeliveryTaxRate();
-    final currentHospitalityTaxRate = await TaxSettingsHelper.loadHospitalityTaxRate();
-    
+    final currentServiceChargeRate =
+        await TaxSettingsHelper.loadServiceChargeRate();
+    final currentDeliveryTaxRate =
+        await TaxSettingsHelper.loadDeliveryTaxRate();
+    final currentHospitalityTaxRate =
+        await TaxSettingsHelper.loadHospitalityTaxRate();
+
     final serviceChargeController = TextEditingController(
       text: (currentServiceChargeRate * 100).toStringAsFixed(2),
     );
@@ -682,7 +748,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: serviceChargeController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Service Charge Rate (%)',
                     hintText: '10.0',
@@ -701,7 +769,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: deliveryTaxController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Delivery Tax Rate (%)',
                     hintText: '5.0',
@@ -720,7 +790,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: hospitalityTaxController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Hospitality Discount Rate (%)',
                     hintText: '5.0',
@@ -747,11 +819,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             AppButton(
               label: l10n.save,
               onPressed: () async {
-                final serviceChargeRate = double.tryParse(serviceChargeController.text);
-                final deliveryTaxRate = double.tryParse(deliveryTaxController.text);
-                final hospitalityTaxRate = double.tryParse(hospitalityTaxController.text);
-                
-                if (serviceChargeRate == null || serviceChargeRate < 0 || serviceChargeRate > 100) {
+                final serviceChargeRate = double.tryParse(
+                  serviceChargeController.text,
+                );
+                final deliveryTaxRate = double.tryParse(
+                  deliveryTaxController.text,
+                );
+                final hospitalityTaxRate = double.tryParse(
+                  hospitalityTaxController.text,
+                );
+
+                if (serviceChargeRate == null ||
+                    serviceChargeRate < 0 ||
+                    serviceChargeRate > 100) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(l10n.pleaseEnterValidServiceChargeRate),
@@ -760,8 +840,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   return;
                 }
-                
-                if (deliveryTaxRate == null || deliveryTaxRate < 0 || deliveryTaxRate > 100) {
+
+                if (deliveryTaxRate == null ||
+                    deliveryTaxRate < 0 ||
+                    deliveryTaxRate > 100) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(l10n.pleaseEnterValidDeliveryTaxRate),
@@ -770,8 +852,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   return;
                 }
-                
-                if (hospitalityTaxRate == null || hospitalityTaxRate < 0 || hospitalityTaxRate > 100) {
+
+                if (hospitalityTaxRate == null ||
+                    hospitalityTaxRate < 0 ||
+                    hospitalityTaxRate > 100) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(l10n.pleaseEnterValidHospitalityTaxRate),
@@ -780,19 +864,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   return;
                 }
-                
-                final savedService = await TaxSettingsHelper.saveServiceChargeRate(serviceChargeRate / 100);
-                final savedDelivery = await TaxSettingsHelper.saveDeliveryTaxRate(deliveryTaxRate / 100);
-                final savedHospitality = await TaxSettingsHelper.saveHospitalityTaxRate(hospitalityTaxRate / 100);
-                
+
+                final savedService =
+                    await TaxSettingsHelper.saveServiceChargeRate(
+                      serviceChargeRate / 100,
+                    );
+                final savedDelivery =
+                    await TaxSettingsHelper.saveDeliveryTaxRate(
+                      deliveryTaxRate / 100,
+                    );
+                final savedHospitality =
+                    await TaxSettingsHelper.saveHospitalityTaxRate(
+                      hospitalityTaxRate / 100,
+                    );
+
                 if (context.mounted) {
                   Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(savedService && savedDelivery && savedHospitality
-                          ? l10n.settingsSavedSuccessfully
-                          : l10n.failedToSaveSettings),
-                      backgroundColor: savedService && savedDelivery && savedHospitality ? AppColors.secondary : AppColors.error,
+                      content: Text(
+                        savedService && savedDelivery && savedHospitality
+                            ? l10n.settingsSavedSuccessfully
+                            : l10n.failedToSaveSettings,
+                      ),
+                      backgroundColor:
+                          savedService && savedDelivery && savedHospitality
+                          ? AppColors.secondary
+                          : AppColors.error,
                     ),
                   );
                 }
@@ -807,14 +905,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showPrinterSettings(BuildContext context, AppLocalizations l10n) async {
     // Load current settings
     final currentSettings = await PrinterSettingsHelper.loadSettings();
-    
+
     // Get available printers
     List<Printer> printers = [];
     String? selectedPrinterName;
-    
+
     try {
       printers = await Printing.listPrinters();
-      
+
       // Find current printer name if it exists
       if (currentSettings.printerName.isNotEmpty && printers.isNotEmpty) {
         // Check if saved printer name exists in the list
@@ -842,17 +940,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       debugPrint('Error loading printers: $e');
       printers = [];
     }
-    
+
     // Controllers for form fields
-    final paperSizeController = TextEditingController(text: currentSettings.paperSize);
-    final paperSourceController = TextEditingController(text: currentSettings.paperSource);
-    final widthController = TextEditingController(text: currentSettings.width.toString());
+    final paperSizeController = TextEditingController(
+      text: currentSettings.paperSize,
+    );
+    final paperSourceController = TextEditingController(
+      text: currentSettings.paperSource,
+    );
+    final widthController = TextEditingController(
+      text: currentSettings.width.toString(),
+    );
     final heightController = TextEditingController(
-      text: currentSettings.height == double.infinity ? '' : currentSettings.height.toString()
+      text: currentSettings.height == double.infinity
+          ? ''
+          : currentSettings.height.toString(),
     );
     bool isPortrait = currentSettings.isPortrait;
     bool isLoadingPrinters = false;
-    
+
     if (!mounted) return;
     final navigatorContext = context;
     if (!navigatorContext.mounted) return;
@@ -880,7 +986,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.refresh),
                         onPressed: isLoadingPrinters
@@ -890,14 +998,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   isLoadingPrinters = true;
                                 });
                                 try {
-                                  final updatedPrinters = await Printing.listPrinters();
+                                  final updatedPrinters =
+                                      await Printing.listPrinters();
                                   setDialogState(() {
                                     printers = updatedPrinters;
                                     if (updatedPrinters.isNotEmpty) {
-                                      final defaultPrinter = updatedPrinters.firstWhere(
-                                        (p) => p.isDefault,
-                                        orElse: () => updatedPrinters.first,
-                                      );
+                                      final defaultPrinter = updatedPrinters
+                                          .firstWhere(
+                                            (p) => p.isDefault,
+                                            orElse: () => updatedPrinters.first,
+                                          );
                                       selectedPrinterName = defaultPrinter.name;
                                     }
                                     isLoadingPrinters = false;
@@ -918,7 +1028,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (printer.isDefault)
-                              const Icon(Icons.star, size: 16, color: AppColors.primary),
+                              const Icon(
+                                Icons.star,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
                             if (printer.isDefault) const SizedBox(width: 4),
                             Flexible(
                               child: Text(
@@ -939,7 +1053,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: AppSpacing.md),
                 ] else ...[
                   TextField(
-                    controller: TextEditingController(text: currentSettings.printerName),
+                    controller: TextEditingController(
+                      text: currentSettings.printerName,
+                    ),
                     decoration: InputDecoration(
                       labelText: l10n.printerName,
                       border: const OutlineInputBorder(),
@@ -949,7 +1065,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                 ],
-                
+
                 // Paper Size
                 TextField(
                   controller: paperSizeController,
@@ -960,7 +1076,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                
+
                 // Paper Source
                 TextField(
                   controller: paperSourceController,
@@ -971,7 +1087,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                
+
                 // Width (mm)
                 TextField(
                   controller: widthController,
@@ -981,10 +1097,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     hintText: '80',
                     suffixText: 'mm',
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                
+
                 // Height (mm) - empty for continuous
                 TextField(
                   controller: heightController,
@@ -995,10 +1113,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     suffixText: 'mm',
                     helperText: l10n.leaveEmptyForContinuous,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                
+
                 // Orientation
                 Text(l10n.orientation, style: AppTextStyles.bodyMedium),
                 const SizedBox(height: AppSpacing.sm),
@@ -1070,7 +1190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Parse width and height
                 double width = currentSettings.width;
                 double height = currentSettings.height;
-                
+
                 try {
                   if (widthController.text.trim().isNotEmpty) {
                     width = double.parse(widthController.text.trim());
@@ -1084,36 +1204,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('${l10n.invalidNumber}: ${l10n.paperWidth}/${l10n.paperHeight}'),
+                        content: Text(
+                          '${l10n.invalidNumber}: ${l10n.paperWidth}/${l10n.paperHeight}',
+                        ),
                         backgroundColor: AppColors.error,
                       ),
                     );
                   }
                   return;
                 }
-                
+
                 final newSettings = PrinterSettings(
-                  printerName: selectedPrinterName ?? currentSettings.printerName,
-                  paperSize: paperSizeController.text.trim().isEmpty 
-                      ? currentSettings.paperSize 
+                  printerName:
+                      selectedPrinterName ?? currentSettings.printerName,
+                  paperSize: paperSizeController.text.trim().isEmpty
+                      ? currentSettings.paperSize
                       : paperSizeController.text.trim(),
-                  paperSource: paperSourceController.text.trim().isEmpty 
-                      ? currentSettings.paperSource 
+                  paperSource: paperSourceController.text.trim().isEmpty
+                      ? currentSettings.paperSource
                       : paperSourceController.text.trim(),
                   isPortrait: isPortrait,
                   width: width,
                   height: height,
                 );
-                
-                final saved = await PrinterSettingsHelper.saveSettings(newSettings);
+
+                final saved = await PrinterSettingsHelper.saveSettings(
+                  newSettings,
+                );
                 if (context.mounted) {
                   Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(saved 
-                          ? l10n.printerConfigured 
-                          : l10n.printerConfigurationFailed),
-                      backgroundColor: saved ? AppColors.secondary : AppColors.error,
+                      content: Text(
+                        saved
+                            ? l10n.printerConfigured
+                            : l10n.printerConfigurationFailed,
+                      ),
+                      backgroundColor: saved
+                          ? AppColors.secondary
+                          : AppColors.error,
                     ),
                   );
                 }
@@ -1169,7 +1298,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _restoreFromBackup(BuildContext context, AppLocalizations l10n) async {
+  Future<void> _restoreFromBackup(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1314,7 +1446,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _changeLanguage(String languageCode) async {
     await LocaleHelper.setLanguage(languageCode);
-    
+
     if (mounted) {
       final appState = SmartSalesApp.of(context);
       if (appState != null) {
@@ -1352,11 +1484,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _handleImportRawMaterials(BuildContext context, AppLocalizations l10n) async {
+  Future<void> _handleImportRawMaterials(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
     if (!mounted) return;
     final productBloc = context.read<ProductBloc>();
     try {
-      final result = await ExcelImporter.pickExcelFile();
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
       if (result == null || result.files.isEmpty) {
         return;
       }
@@ -1378,14 +1516,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       try {
         // Import raw materials with isPosOnly = false (default)
-        final items = await ExcelImporter.importRawMaterials(filePath);
+        final items = await CsvImporter.importRawMaterialsCsv(filePath);
         if (!mounted) return;
         if (items.isEmpty) {
           message = 'No raw materials found in the file.';
         } else {
           productBloc.add(ImportItems(items));
           success = true;
-          message = 'Raw materials imported successfully (${items.length} items). These items will appear in inventory.';
+          message =
+              'Raw materials imported successfully (${items.length} items). These items will appear in inventory.';
         }
       } catch (e) {
         message = 'Error importing raw materials: $e';
@@ -1412,12 +1551,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _buildDeviceTile(BuildContext context, device, bool isCurrentDevice, master, AppLocalizations l10n) {
+  Widget _buildDeviceTile(
+    BuildContext context,
+    device,
+    bool isCurrentDevice,
+    master,
+    AppLocalizations l10n,
+  ) {
     final isMaster = device.isMaster;
     return ListTile(
       leading: Icon(
-        isMaster ? Icons.star : (isCurrentDevice ? Icons.phone_android : Icons.devices),
-        color: isMaster ? AppColors.primary : (isCurrentDevice ? AppColors.primary : AppColors.textSecondary),
+        isMaster
+            ? Icons.star
+            : (isCurrentDevice ? Icons.phone_android : Icons.devices),
+        color: isMaster
+            ? AppColors.primary
+            : (isCurrentDevice ? AppColors.primary : AppColors.textSecondary),
       ),
       title: Row(
         children: [
@@ -1451,12 +1600,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             IconButton(
               icon: const Icon(Icons.star_outline, color: AppColors.primary),
               tooltip: l10n.setAsMaster,
-              onPressed: () => _showSetAsMasterDialog(context, device, master, l10n),
+              onPressed: () =>
+                  _showSetAsMasterDialog(context, device, master, l10n),
             ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: AppColors.error),
             tooltip: l10n.deleteDevice,
-            onPressed: () => _showDeleteDeviceDialog(context, device, master, l10n),
+            onPressed: () =>
+                _showDeleteDeviceDialog(context, device, master, l10n),
           ),
         ],
       ),
@@ -1474,8 +1625,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         syncState.isSyncing
             ? 'Syncing...'
             : syncState.pendingRecords > 0
-                ? '${syncState.pendingRecords} pending records'
-                : l10n.allSynced,
+            ? '${syncState.pendingRecords} pending records'
+            : l10n.allSynced,
       ),
       trailing: syncState.isSyncing
           ? const SizedBox(
@@ -1487,12 +1638,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSyncActionTile(BuildContext context, SyncReady syncState, AppLocalizations l10n) {
+  Widget _buildSyncActionTile(
+    BuildContext context,
+    SyncReady syncState,
+    AppLocalizations l10n,
+  ) {
     return ListTile(
       leading: const Icon(Icons.sync, color: AppColors.primary),
       title: Text(l10n.syncNow),
       subtitle: syncState.lastSyncTime != null
-          ? Text(l10n.lastSync(_formatDateTime(DateTime.parse(syncState.lastSyncTime!))))
+          ? Text(
+              l10n.lastSync(
+                _formatDateTime(
+                  DateTime.tryParse(syncState.lastSyncTime ?? '') ??
+                      DateTime.now(),
+                ),
+              ),
+            )
           : null,
       trailing: const Icon(Icons.chevron_right),
       onTap: syncState.isOnline && !syncState.isSyncing
@@ -1519,7 +1681,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _handleSignOut(BuildContext context, AppLocalizations l10n) {
     // Get AuthBloc from the outer context before showing dialog
     final authBloc = context.read<AuthBloc>();
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1543,9 +1705,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   /// Show Promote to Admin Dialog
-  void _showPromoteToAdminDialog(BuildContext context, user, AppLocalizations l10n) {
+  void _showPromoteToAdminDialog(
+    BuildContext context,
+    user,
+    AppLocalizations l10n,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1586,7 +1751,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (dialogContext) {
         // Get BLoCs from outer context before building dialog
         final userMgmtBloc = context.read<UserManagementBloc>();
-        
+
         return StatefulBuilder(
           builder: (innerContext, setDialogState) => AlertDialog(
             title: Text(l10n.createNewUser),
@@ -1659,7 +1824,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       items: predefinedRoles.map((role) {
                         return DropdownMenuItem(
                           value: role,
-                          child: Text(role[0].toUpperCase() + role.substring(1)),
+                          child: Text(
+                            role[0].toUpperCase() + role.substring(1),
+                          ),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -1692,21 +1859,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                     return;
                   }
-                  if (passwordController.text != confirmPasswordController.text) {
+                  if (passwordController.text !=
+                      confirmPasswordController.text) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(l10n.passwordsDoNotMatch)),
                     );
                     return;
                   }
-                  
-                  final role = isCustomRole 
+
+                  final role = isCustomRole
                       ? customRoleController.text.trim()
                       : selectedRole;
-                  
+
                   if (role.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.roleRequired)),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(l10n.roleRequired)));
                     return;
                   }
 
@@ -1749,9 +1917,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const Icon(Icons.lock_reset, color: AppColors.primary),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text('Change Password for ${user.username}'),
-                ),
+                Expanded(child: Text('Change Password for ${user.username}')),
               ],
             ),
             content: SingleChildScrollView(
@@ -1849,7 +2015,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     return;
                   }
 
-                  if (newPasswordController.text != confirmPasswordController.text) {
+                  if (newPasswordController.text !=
+                      confirmPasswordController.text) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Passwords do not match'),
@@ -1889,7 +2056,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Error changing password: ${e.toString()}'),
+                          content: Text(
+                            'Error changing password: ${e.toString()}',
+                          ),
                           backgroundColor: AppColors.error,
                         ),
                       );
@@ -1912,7 +2081,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ) {
     // Get BLoC from outer context before building dialog
     final userMgmtBloc = context.read<UserManagementBloc>();
-    
+
     // Create a map of current permissions
     final permissionMap = <String, bool>{};
     for (final perm in currentPermissions) {
@@ -1957,36 +2126,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Builder(
                       builder: (builderContext) {
                         final displayedPermissions = <String>{};
-                        final builderL10n = AppLocalizations.of(builderContext)!;
+                        final builderL10n = AppLocalizations.of(
+                          builderContext,
+                        )!;
                         final expansionTiles = <Widget>[];
-                        
+
                         for (final module in PermissionKeys.getModules()) {
-                          final modulePermissions = PermissionKeys.getPermissionsByModule(module);
+                          final modulePermissions =
+                              PermissionKeys.getPermissionsByModule(module);
                           // Filter out already displayed permissions
-                          final uniquePermissions = modulePermissions.where((key) {
+                          final uniquePermissions = modulePermissions.where((
+                            key,
+                          ) {
                             if (displayedPermissions.contains(key)) {
                               return false; // Skip duplicate
                             }
                             displayedPermissions.add(key);
                             return true;
                           }).toList();
-                          
+
                           // Only show expansion tile if there are unique permissions
                           if (uniquePermissions.isEmpty) {
                             continue;
                           }
-                          
+
                           expansionTiles.add(
                             ExpansionTile(
                               title: Text(
-                                PermissionKeys.getModuleLabel(module, builderL10n),
+                                PermissionKeys.getModuleLabel(
+                                  module,
+                                  builderL10n,
+                                ),
                                 style: AppTextStyles.titleMedium.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               children: uniquePermissions.map((key) {
                                 return CheckboxListTile(
-                                  title: Text(PermissionKeys.getLabel(key, builderL10n)),
+                                  title: Text(
+                                    PermissionKeys.getLabel(key, builderL10n),
+                                  ),
                                   value: allPermissions[key] ?? false,
                                   onChanged: (value) {
                                     setDialogState(() {
@@ -1995,21 +2174,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   },
                                 );
                               }).toList(),
-                          ),
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: expansionTiles,
                         );
-                      }
-                      
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: expansionTiles,
-                      );
-                    },
-                  ),
-                ],
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
@@ -2037,12 +2216,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext);
                   }
-                  
+
                   if (mounted && context.mounted) {
                     final successL10n = AppLocalizations.of(context)!;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(successL10n.permissionsUpdatedSuccessfully),
+                        content: Text(
+                          successL10n.permissionsUpdatedSuccessfully,
+                        ),
                         backgroundColor: AppColors.success,
                       ),
                     );
@@ -2060,7 +2241,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Show Add Device Dialog
-  void _showAddDeviceDialog(BuildContext context, master, AppLocalizations l10n) async {
+  void _showAddDeviceDialog(
+    BuildContext context,
+    master,
+    AppLocalizations l10n,
+  ) async {
     final deviceNameController = TextEditingController();
     final macAddressController = TextEditingController();
     bool isLoadingMac = false;
@@ -2068,7 +2253,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Automatically fetch physical MAC address when dialog opens
     try {
       final macAddress = await MacAddressHelper.getMacAddress();
-      if (macAddress != null && macAddress.isNotEmpty && macAddress != '02:00:00:00:00:00') {
+      if (macAddress != null &&
+          macAddress.isNotEmpty &&
+          macAddress != '02:00:00:00:00:00') {
         macAddressController.text = macAddress;
       } else {
         // If physical MAC not available, try to get device identifier
@@ -2117,21 +2304,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           : const Icon(Icons.refresh),
                       onPressed: isLoadingMac
                           ? null
-                            : () async {
+                          : () async {
                               setDialogState(() {
                                 isLoadingMac = true;
                               });
                               try {
                                 // Get physical MAC address
-                                final macAddress = await MacAddressHelper.getMacAddress();
-                                if (macAddress != null && macAddress.isNotEmpty && macAddress != '02:00:00:00:00:00') {
+                                final macAddress =
+                                    await MacAddressHelper.getMacAddress();
+                                if (macAddress != null &&
+                                    macAddress.isNotEmpty &&
+                                    macAddress != '02:00:00:00:00:00') {
                                   macAddressController.text = macAddress;
                                 } else {
                                   // If physical MAC not available, show error
                                   if (innerContext.mounted) {
-                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                    ScaffoldMessenger.of(
+                                      innerContext,
+                                    ).showSnackBar(
                                       SnackBar(
-                                        content: const Text('Physical MAC address not available. Please enter manually.'),
+                                        content: const Text(
+                                          'Physical MAC address not available. Please enter manually.',
+                                        ),
                                         backgroundColor: AppColors.error,
                                       ),
                                     );
@@ -2139,9 +2333,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 }
                               } catch (e) {
                                 if (innerContext.mounted) {
-                                  ScaffoldMessenger.of(innerContext).showSnackBar(
+                                  ScaffoldMessenger.of(
+                                    innerContext,
+                                  ).showSnackBar(
                                     SnackBar(
-                                      content: Text('Failed to get MAC address: $e'),
+                                      content: Text(
+                                        'Failed to get MAC address: $e',
+                                      ),
                                       backgroundColor: AppColors.error,
                                     ),
                                   );
@@ -2169,7 +2367,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () {
                 if (deviceNameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${l10n.deviceName} ${l10n.required.toLowerCase()}')),
+                    SnackBar(
+                      content: Text(
+                        '${l10n.deviceName} ${l10n.required.toLowerCase()}',
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -2206,12 +2408,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Show Set as Master Dialog
-  void _showSetAsMasterDialog(BuildContext context, device, master, AppLocalizations l10n) {
+  void _showSetAsMasterDialog(
+    BuildContext context,
+    device,
+    master,
+    AppLocalizations l10n,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.setAsMaster),
-        content: Text('Are you sure you want to set "${device.deviceName}" as the master device?'),
+        content: Text(
+          'Are you sure you want to set "${device.deviceName}" as the master device?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -2243,7 +2452,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Show Delete Device Dialog
-  void _showDeleteDeviceDialog(BuildContext context, device, master, AppLocalizations l10n) {
+  void _showDeleteDeviceDialog(
+    BuildContext context,
+    device,
+    master,
+    AppLocalizations l10n,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -2281,7 +2495,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Show Delete All Devices Dialog
-  void _showDeleteAllDevicesDialog(BuildContext context, master, currentDevice, AppLocalizations l10n) {
+  void _showDeleteAllDevicesDialog(
+    BuildContext context,
+    master,
+    currentDevice,
+    AppLocalizations l10n,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -2319,7 +2538,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Show Manage Floors Dialog
-  void _showManageFloorsDialog(BuildContext context, master, List<Device> devices, AppLocalizations l10n) {
+  void _showManageFloorsDialog(
+    BuildContext context,
+    master,
+    List<Device> devices,
+    AppLocalizations l10n,
+  ) {
     // Create a map to track device-floor assignments
     final Map<String, int?> deviceFloors = {};
     for (final device in devices) {
@@ -2340,7 +2564,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(
                     l10n.selectDeviceAndFloor,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   ...devices.map((device) {
@@ -2359,12 +2586,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               Expanded(
                                 child: DropdownButtonFormField<int?>(
                                   // ignore: deprecated_member_use
-                                  value: deviceFloors[device.deviceId] ?? device.floor,
+                                  value:
+                                      deviceFloors[device.deviceId] ??
+                                      device.floor,
                                   isExpanded: true,
                                   decoration: InputDecoration(
                                     labelText: l10n.floor,
                                     border: const OutlineInputBorder(),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                   ),
                                   items: [
                                     DropdownMenuItem<int?>(

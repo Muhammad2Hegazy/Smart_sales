@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:intl/intl.dart';
@@ -347,7 +346,7 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
                         children: [
                           // Supplier Dropdown
                           DropdownButtonFormField<String>(
-                            value: _selectedSupplierId,
+                            initialValue: _selectedSupplierId,
                             isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'المورد',
@@ -391,45 +390,30 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: RadioListTile<String>(
-                                  title: const Text('نقدى'),
-                                  value: 'cash',
-                                  groupValue: _paymentType,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _paymentType = value!;
-                                      _paidAmount = null;
-                                    });
-                                  },
-                                  contentPadding: EdgeInsets.zero,
-                                ),
+                          SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment<String>(
+                                value: 'cash',
+                                label: Text('نقدى'),
                               ),
-                              Expanded(
-                                child: RadioListTile<String>(
-                                  title: const Text('اجل'),
-                                  value: 'credit',
-                                  groupValue: _paymentType,
-                                  onChanged: (value) {
-                                    setState(() => _paymentType = value!);
-                                  },
-                                  contentPadding: EdgeInsets.zero,
-                                ),
+                              ButtonSegment<String>(
+                                value: 'credit',
+                                label: Text('اجل'),
                               ),
-                              Expanded(
-                                child: RadioListTile<String>(
-                                  title: const Text('دفعه'),
-                                  value: 'partial',
-                                  groupValue: _paymentType,
-                                  onChanged: (value) {
-                                    setState(() => _paymentType = value!);
-                                  },
-                                  contentPadding: EdgeInsets.zero,
-                                ),
+                              ButtonSegment<String>(
+                                value: 'partial',
+                                label: Text('دفعه'),
                               ),
                             ],
+                            selected: {_paymentType},
+                            onSelectionChanged: (Set<String> newSelection) {
+                              setState(() {
+                                _paymentType = newSelection.first;
+                                if (_paymentType != 'partial') {
+                                  _paidAmount = null;
+                                }
+                              });
+                            },
                           ),
                           if (_paymentType == 'partial' || _paymentType == 'credit') ...[
                             const SizedBox(height: AppSpacing.md),
@@ -509,7 +493,7 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen> {
                               columnSpacing: 12,
                               horizontalMargin: 12,
                               minWidth: 1200,
-                              headingRowColor: MaterialStateProperty.all(AppColors.background),
+                              headingRowColor: WidgetStateProperty.all(AppColors.background),
                               headingRowHeight: 50,
                               dataRowHeight: 50,
                               columns: [

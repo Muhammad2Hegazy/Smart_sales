@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' hide Category;
+import 'dart:io';
 import '../models/category.dart';
 import '../models/sub_category.dart';
 import '../models/item.dart';
@@ -11,12 +12,12 @@ class ProductService {
   ProductService._internal();
 
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  
+
   List<Category> _categories = [];
   List<SubCategory> _subCategories = [];
   List<Item> _items = [];
   List<Note> _notes = [];
-  
+
   bool _isInitialized = false;
 
   // Getters
@@ -28,11 +29,37 @@ class ProductService {
   // Initialize and load data from database
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     // Access database to trigger lazy initialization
     await _dbHelper.database;
+
+    // Silent Auto-Sync from CSV project folder
+    await autoSyncCsv();
+
     await loadFromDatabase();
     _isInitialized = true;
+  }
+
+  /// Automatically import from project 'items' folder if files exist
+  Future<void> autoSyncCsv() async {
+    try {
+      const categoriesPath = 'items/categories_import.csv';
+      const subCategoriesPath = 'items/sub_categories_import.csv';
+      const itemsPath = 'items/items_import.csv';
+
+      if (File(categoriesPath).existsSync() &&
+          File(subCategoriesPath).existsSync() &&
+          File(itemsPath).existsSync()) {
+        debugPrint('ProductService: Auto-syncing CSV data...');
+        await _dbHelper.importDataFromCsv(
+          categoriesPath: categoriesPath,
+          subCategoriesPath: subCategoriesPath,
+          itemsPath: itemsPath,
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductService: Silent auto-sync error: $e');
+    }
   }
 
   // Reload data from database (useful after updates)
@@ -46,7 +73,7 @@ class ProductService {
       _subCategories = await _dbHelper.getAllSubCategories();
       _items = await _dbHelper.getAllItems();
       _notes = await _dbHelper.getAllNotes();
-      
+
       // Ensure all items have valid stockQuantity and stockUnit
       _items = _items.map((item) {
         double stockQty;
@@ -61,14 +88,11 @@ class ProductService {
         }
         // Only recreate if values are invalid
         if (stockQty != item.stockQuantity || stockUnit != item.stockUnit) {
-          return item.copyWith(
-            stockQuantity: stockQty,
-            stockUnit: stockUnit,
-          );
+          return item.copyWith(stockQuantity: stockQty, stockUnit: stockUnit);
         }
         return item;
       }).toList();
-      
+
       // Link notes to items
       _linkNotesToItems();
     } catch (e) {
@@ -186,15 +210,10 @@ class ProductService {
         .expand((cat) => cat.subCategories)
         .toList()
         .cast<SubCategory>();
-    
-    _items = _subCategories
-        .expand((sub) => sub.items)
-        .toList()
-        .cast<Item>();
-    
-    _notes = _items
-        .expand((item) => item.notes)
-        .toList();
+
+    _items = _subCategories.expand((sub) => sub.items).toList().cast<Item>();
+
+    _notes = _items.expand((item) => item.notes).toList();
   }
 
   // Get subcategories by category ID
@@ -275,51 +294,44 @@ class ProductService {
     final categorySubCategories = _categories
         .expand((cat) => cat.subCategories)
         .toList();
-    
+
     // Merge imported subcategories with category subcategories
     // Imported subcategories take precedence (by ID)
     final subCategoryMap = <String, SubCategory>{};
-    
+
     // First add category subcategories
     for (var sub in categorySubCategories) {
       subCategoryMap[sub.id] = sub;
     }
-    
+
     // Then add/override with imported subcategories (preserve imported ones)
     for (var sub in _subCategories) {
       subCategoryMap[sub.id] = sub;
     }
-    
+
     // Update subcategories with merged list
     _subCategories = subCategoryMap.values.toList();
-    
+
     // If items were imported directly, keep them
     // Otherwise, get items from subcategories
     if (_items.isEmpty) {
-      _items = _subCategories
-          .expand((sub) => sub.items)
-          .map((item) {
-            // Ensure all items have stockQuantity and stockUnit
-            double stockQty;
-            String stockUnit;
-            try {
-              stockQty = item.stockQuantity;
-              stockUnit = item.stockUnit;
-            } catch (e) {
-              // If stockQuantity or stockUnit is null or invalid, use defaults
-              stockQty = 0.0;
-              stockUnit = 'number';
-            }
-            return item.copyWith(
-              stockQuantity: stockQty,
-              stockUnit: stockUnit,
-            );
-          })
-          .toList();
+      _items = _subCategories.expand((sub) => sub.items).map((item) {
+        // Ensure all items have stockQuantity and stockUnit
+        double stockQty;
+        String stockUnit;
+        try {
+          stockQty = item.stockQuantity;
+          stockUnit = item.stockUnit;
+        } catch (e) {
+          // If stockQuantity or stockUnit is null or invalid, use defaults
+          stockQty = 0.0;
+          stockUnit = 'number';
+        }
+        return item.copyWith(stockQuantity: stockQty, stockUnit: stockUnit);
+      }).toList();
     }
-    
+
     // Link notes to items after updating
     _linkNotesToItems();
   }
 }
-

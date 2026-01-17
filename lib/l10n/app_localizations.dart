@@ -653,6 +653,12 @@ abstract class AppLocalizations {
   /// **'Import Notes'**
   String get importNotes;
 
+  /// No description provided for @importAllWithJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Import All via JSON'**
+  String get importAllWithJson;
+
   /// No description provided for @importFromExcel.
   ///
   /// In en, this message translates to:
@@ -700,6 +706,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select Table'**
   String get selectTable;
+
+  /// No description provided for @selectedTables.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Tables'**
+  String get selectedTables;
 
   /// No description provided for @reports.
   ///

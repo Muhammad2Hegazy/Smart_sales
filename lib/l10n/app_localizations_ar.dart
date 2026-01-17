@@ -290,6 +290,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get importNotes => 'استيراد الملاحظات';
 
   @override
+  String get importAllWithJson => 'استيراد الكل عبر JSON';
+
+  @override
   String get importFromExcel => 'استيراد من Excel';
 
   @override
@@ -312,6 +315,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get selectTable => 'اختر الطاولة';
+
+  @override
+  String get selectedTables => 'الطاولات المحددة';
 
   @override
   String get reports => 'التقارير';

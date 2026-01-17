@@ -208,7 +208,7 @@ class ConsolidatedSalesReport {
               columnSpacing: 12,
               horizontalMargin: 12,
               minWidth: 1200,
-              headingRowColor: MaterialStateProperty.all(AppColors.background),
+              headingRowColor: WidgetStateProperty.all(AppColors.background),
               headingRowHeight: 50,
               dataRowHeight: 50,
               columns: [
@@ -278,7 +278,7 @@ class ConsolidatedSalesReport {
                   final isEven = index % 2 == 0;
                   
                   return DataRow2(
-                    color: MaterialStateProperty.all(
+                    color: WidgetStateProperty.all(
                       isEven ? Colors.white : AppColors.background,
                     ),
                     cells: [
@@ -333,7 +333,7 @@ class ConsolidatedSalesReport {
                 }),
                 // Summary row
                 DataRow2(
-                  color: MaterialStateProperty.all(AppColors.primary.withValues(alpha: 0.1)),
+                  color: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.1)),
                   cells: [
                     DataCell(
                       Text(

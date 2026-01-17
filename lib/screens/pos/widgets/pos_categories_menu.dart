@@ -28,7 +28,7 @@ class POSCategoriesMenu extends StatelessWidget {
         
         if (categories.isEmpty) {
           return Container(
-            width: 200,
+            width: 175,
             decoration: BoxDecoration(
               color: AppColors.surface,
               border: Border(
@@ -39,8 +39,9 @@ class POSCategoriesMenu extends StatelessWidget {
               child: Text(
                 l10n.noCategories,
                 textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textSecondary,
+                  fontSize: 12,
                 ),
               ),
             ),
@@ -48,7 +49,7 @@ class POSCategoriesMenu extends StatelessWidget {
         }
 
         return Container(
-          width: 200,
+          width: 175,
           decoration: BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -58,20 +59,28 @@ class POSCategoriesMenu extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.sm,
+                ),
                 decoration: const BoxDecoration(
                   color: AppColors.primary,
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.category, color: Colors.white),
-                    const SizedBox(width: AppSpacing.sm),
+                    const Icon(
+                      Icons.category,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         l10n.category,
-                        style: AppTextStyles.titleMedium.copyWith(
+                        style: AppTextStyles.bodyMedium.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -87,7 +96,10 @@ class POSCategoriesMenu extends StatelessWidget {
                     return InkWell(
                       onTap: () => onCategorySelected(isSelected ? null : category.id),
                       child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs,
+                          vertical: AppSpacing.xs,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary.withValues(alpha: 0.1)
@@ -97,7 +109,7 @@ class POSCategoriesMenu extends StatelessWidget {
                               color: isSelected
                                   ? AppColors.primary
                                   : Colors.transparent,
-                              width: 4,
+                              width: 3,
                             ),
                           ),
                         ),
@@ -106,20 +118,24 @@ class POSCategoriesMenu extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 category.name,
-                                style: AppTextStyles.bodyLarge.copyWith(
+                                style: AppTextStyles.bodySmall.copyWith(
                                   color: isSelected
                                       ? AppColors.primary
                                       : AppColors.textPrimary,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.normal,
+                                  fontSize: 12,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isSelected)
                               const Icon(
                                 Icons.chevron_right,
                                 color: AppColors.primary,
+                                size: 16,
                               ),
                           ],
                         ),

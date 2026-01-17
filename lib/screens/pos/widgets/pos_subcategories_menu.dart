@@ -36,7 +36,7 @@ class POSSubCategoriesMenu extends StatelessWidget {
 
         if (subCategories.isEmpty) {
           return Container(
-            width: 200,
+            width: 160,
             decoration: BoxDecoration(
               color: AppColors.surface,
               border: Border(
@@ -47,8 +47,9 @@ class POSSubCategoriesMenu extends StatelessWidget {
               child: Text(
                 l10n.noSubcategories,
                 textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textSecondary,
+                  fontSize: 12,
                 ),
               ),
             ),
@@ -56,7 +57,7 @@ class POSSubCategoriesMenu extends StatelessWidget {
         }
 
         return Container(
-          width: 200,
+          width: 160,
           decoration: BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -66,20 +67,28 @@ class POSSubCategoriesMenu extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.sm,
+                ),
                 decoration: const BoxDecoration(
                   color: AppColors.secondary,
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.folder, color: Colors.white),
-                    const SizedBox(width: AppSpacing.sm),
+                    const Icon(
+                      Icons.folder,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         l10n.subCategory,
-                        style: AppTextStyles.titleMedium.copyWith(
+                        style: AppTextStyles.bodyMedium.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -97,7 +106,10 @@ class POSSubCategoriesMenu extends StatelessWidget {
                         isSelected ? null : subCategory.id,
                       ),
                       child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs,
+                          vertical: AppSpacing.xs,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.secondary.withValues(alpha: 0.1)
@@ -107,7 +119,7 @@ class POSSubCategoriesMenu extends StatelessWidget {
                               color: isSelected
                                   ? AppColors.secondary
                                   : Colors.transparent,
-                              width: 4,
+                              width: 3,
                             ),
                           ),
                         ),
@@ -116,20 +128,24 @@ class POSSubCategoriesMenu extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 subCategory.name,
-                                style: AppTextStyles.bodyLarge.copyWith(
+                                style: AppTextStyles.bodySmall.copyWith(
                                   color: isSelected
                                       ? AppColors.secondary
                                       : AppColors.textPrimary,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.normal,
+                                  fontSize: 12,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isSelected)
                               const Icon(
                                 Icons.chevron_right,
                                 color: AppColors.secondary,
+                                size: 16,
                               ),
                           ],
                         ),

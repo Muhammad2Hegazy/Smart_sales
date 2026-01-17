@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import '../l10n/app_localizations.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
@@ -13,6 +14,9 @@ import '../bloc/auth/auth_event.dart';
 import '../bloc/auth/auth_state.dart';
 import '../core/database/database_helper.dart';
 import '../core/models/user_profile.dart';
+import '../core/models/device.dart';
+import '../core/models/master.dart';
+import '../core/utils/mac_address_helper.dart';
 
 /// Login Screen
 /// UI only - all logic handled by AuthBloc
@@ -91,30 +95,32 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       },
       builder: (context, state) => Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary,
-                AppColors.primaryDark,
-              ],
-            ),
-          ),
-          child: SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Form(
+        body: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primaryDark,
+                  ],
+                ),
+              ),
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Card(
+                      elevation: 8,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Form(
                       key: _formKey,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -429,7 +435,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-          ),
+            ),
+            ),
+            // Transparent button in bottom left
+            Positioned(
+              left: 0,
+              bottom: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _handleMacAddressSave,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const SizedBox(
+                          width: 50,
+                          height: 50,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -469,6 +505,95 @@ class _LoginScreenState extends State<LoginScreen> {
             password: _passwordController.text,
           ),
         );
+  }
+
+  Future<void> _handleMacAddressSave() async {
+    try {
+      // Get MAC address
+      final macAddress = await MacAddressHelper.getMacAddress();
+      
+      if (macAddress == null || macAddress.isEmpty || macAddress == '02:00:00:00:00:00') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to retrieve MAC address'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      final dbHelper = DatabaseHelper();
+      
+      // Check if device with this MAC already exists
+      final existingDevice = await dbHelper.getDeviceByMacAddress(macAddress);
+      
+      if (existingDevice != null) {
+        // Update last seen time
+        await dbHelper.insertDevice(existingDevice.copyWith(
+          lastSeenAt: DateTime.now(),
+        ));
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('MAC address already registered: $macAddress'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get or create master device
+      var master = await dbHelper.getMaster();
+      String masterDeviceId;
+      
+      if (master == null) {
+        // Create a temporary master
+        masterDeviceId = const Uuid().v4();
+        master = Master(
+          masterDeviceId: masterDeviceId,
+          masterName: 'Master Device',
+          userId: 'system',
+          createdAt: DateTime.now(),
+        );
+        await dbHelper.insertMaster(master);
+      } else {
+        masterDeviceId = master.masterDeviceId;
+      }
+
+      // Create new device entry
+      final device = Device(
+        deviceId: const Uuid().v4(),
+        deviceName: 'Device ${macAddress.substring(macAddress.length - 5)}',
+        masterDeviceId: masterDeviceId,
+        isMaster: false,
+        lastSeenAt: DateTime.now(),
+        macAddress: macAddress,
+      );
+
+      await dbHelper.insertDevice(device);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('MAC address saved: $macAddress'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving MAC address: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   void _showForgotPasswordDialog(BuildContext context) {

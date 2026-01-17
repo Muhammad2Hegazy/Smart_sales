@@ -404,7 +404,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   columnSpacing: 12,
                   horizontalMargin: 12,
                   minWidth: 800,
-                  headingRowColor: MaterialStateProperty.all(AppColors.primary.withValues(alpha: 0.1)),
+                  headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.1)),
                   headingRowHeight: 50,
                   dataRowHeight: 50,
                   smRatio: 0.75,
@@ -717,7 +717,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 DropdownButtonFormField<String>(
-                  value: selectedUnit,
+                  initialValue: selectedUnit,
                   isExpanded: true,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
@@ -754,7 +754,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       DropdownButtonFormField<int>(
-                        value: localBottlesPerCarton,
+                        initialValue: localBottlesPerCarton,
                         isExpanded: true,
                         decoration: InputDecoration(
                           border: OutlineInputBorder(

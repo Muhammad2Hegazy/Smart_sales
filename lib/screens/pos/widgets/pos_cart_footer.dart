@@ -15,11 +15,11 @@ class POSCartFooter extends StatefulWidget {
   final bool allowPrinting;
   final double discountPercentage;
   final ValueChanged<bool> onPrintingChanged;
-  final ValueChanged<double> onDiscountChanged;
+  final Future<void> Function(double) onDiscountChanged;
   final VoidCallback onPrintCustomerInvoice;
   final VoidCallback onPrintKitchenInvoice;
   final VoidCallback onProcessPayment;
-  final VoidCallback onClearCart;
+  final Future<void> Function()? onClearCart;
 
   const POSCartFooter({
     super.key,
@@ -141,9 +141,9 @@ class _POSCartFooterState extends State<POSCartFooter> {
                   isDense: true,
                 ),
                 style: AppTextStyles.bodyMedium,
-                onChanged: (value) {
+                onChanged: (value) async {
                   if (value.isEmpty) {
-                    widget.onDiscountChanged(0.0);
+                    await widget.onDiscountChanged(0.0);
                     return;
                   }
                   
@@ -163,10 +163,10 @@ class _POSCartFooterState extends State<POSCartFooter> {
                         }
                       });
                     }
-                    widget.onDiscountChanged(100.0);
+                    await widget.onDiscountChanged(100.0);
                   } else {
                     // Valid value - just update the discount without touching controller
-                    widget.onDiscountChanged(discount);
+                    await widget.onDiscountChanged(discount);
                   }
                 },
               ),
@@ -284,7 +284,11 @@ class _POSCartFooterState extends State<POSCartFooter> {
               // Clear Cart Button
               AppButton(
                 label: l10n.clearCart,
-                onPressed: cartState.items.isEmpty ? null : widget.onClearCart,
+                onPressed: cartState.items.isEmpty ? null : () async {
+                  if (widget.onClearCart != null) {
+                    await widget.onClearCart!();
+                  }
+                },
                 type: AppButtonType.outline,
                 isFullWidth: true,
               ),

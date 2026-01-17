@@ -226,7 +226,7 @@ class CategorySalesReport {
               columnSpacing: 12,
               horizontalMargin: 12,
               minWidth: 1000,
-              headingRowColor: MaterialStateProperty.all(AppColors.background),
+              headingRowColor: WidgetStateProperty.all(AppColors.background),
               headingRowHeight: 50,
               dataRowHeight: 50,
               columns: [
@@ -305,7 +305,7 @@ class CategorySalesReport {
                 final isEven = index % 2 == 0;
                 
                 return DataRow2(
-                  color: MaterialStateProperty.all(
+                  color: WidgetStateProperty.all(
                     isEven ? Colors.white : AppColors.background,
                   ),
                   cells: [
@@ -451,7 +451,7 @@ class _CategorySalesInputDialogState extends State<_CategorySalesInputDialog> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     DropdownButtonFormField<Category>(
-                      value: _selectedCategory,
+                      initialValue: _selectedCategory,
                       isExpanded: true,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(

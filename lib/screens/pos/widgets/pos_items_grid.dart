@@ -68,18 +68,25 @@ class POSItemsGrid extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.sm,
+                ),
                 decoration: const BoxDecoration(
                   color: AppColors.accent,
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.shopping_bag, color: Colors.white),
-                    const SizedBox(width: AppSpacing.sm),
+                    const Icon(
+                      Icons.shopping_bag,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         l10n.items,
-                        style: AppTextStyles.titleMedium.copyWith(
+                        style: AppTextStyles.bodyMedium.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -96,13 +103,16 @@ class POSItemsGrid extends StatelessWidget {
                     return InkWell(
                       onTap: () => onItemTap(item),
                       child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs,
+                          vertical: AppSpacing.sm,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.transparent,
                           border: Border(
                             left: BorderSide(
                               color: Colors.transparent,
-                              width: 4,
+                              width: 3,
                             ),
                           ),
                         ),
@@ -111,30 +121,35 @@ class POSItemsGrid extends StatelessWidget {
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     item.name,
-                                    style: AppTextStyles.bodyLarge.copyWith(
+                                    style: AppTextStyles.bodyMedium.copyWith(
                                       color: AppColors.textPrimary,
                                       fontWeight: FontWeight.w600,
+                                      fontSize: 13,
                                     ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: AppSpacing.xs),
+                                  const SizedBox(height: 2),
                                   Text(
                                     CurrencyFormatter.format(item.price),
-                                    style: AppTextStyles.bodyMedium.copyWith(
+                                    style: AppTextStyles.bodySmall.copyWith(
                                       color: AppColors.primary,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+                            const SizedBox(width: 4),
                             const Icon(
                               Icons.add_circle_outline,
                               color: AppColors.accent,
+                              size: 18,
                             ),
                           ],
                         ),

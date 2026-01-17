@@ -11,12 +11,12 @@ import '../../../core/repositories/user_management_repository.dart';
 
 /// Table selection menu widget
 class POSTableMenu extends StatefulWidget {
-  final String? selectedTableNumber;
-  final ValueChanged<String?> onTableSelected;
+  final List<String> selectedTableNumbers;
+  final ValueChanged<List<String>> onTableSelected;
 
   const POSTableMenu({
     super.key,
-    required this.selectedTableNumber,
+    required this.selectedTableNumbers,
     required this.onTableSelected,
   });
 
@@ -65,7 +65,7 @@ class _POSTableMenuState extends State<POSTableMenu> {
     final l10n = AppLocalizations.of(context)!;
     
     return Container(
-      width: 200,
+      width: 160,
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
@@ -78,11 +78,15 @@ class _POSTableMenuState extends State<POSTableMenu> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.sm,
+            ),
             child: Text(
               l10n.tables,
-              style: AppTextStyles.titleMedium.copyWith(
+              style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
           ),
@@ -94,7 +98,7 @@ class _POSTableMenuState extends State<POSTableMenu> {
                   context,
                   l10n.takeaway,
                   'takeaway',
-                  widget.selectedTableNumber == 'takeaway',
+                  widget.selectedTableNumbers.contains('takeaway'),
                   Icons.shopping_bag_outlined,
                 ),
                 // Delivery
@@ -102,7 +106,7 @@ class _POSTableMenuState extends State<POSTableMenu> {
                   context,
                   l10n.delivery,
                   'delivery',
-                  widget.selectedTableNumber == 'delivery',
+                  widget.selectedTableNumbers.contains('delivery'),
                   Icons.delivery_dining_outlined,
                 ),
                 // Hospitality Table (only if user has permission)
@@ -111,7 +115,7 @@ class _POSTableMenuState extends State<POSTableMenu> {
                     context,
                     l10n.hospitalityTable,
                     'hospitality',
-                    widget.selectedTableNumber == 'hospitality',
+                    widget.selectedTableNumbers.contains('hospitality'),
                     Icons.restaurant_outlined,
                   ),
                 const Divider(),
@@ -121,7 +125,7 @@ class _POSTableMenuState extends State<POSTableMenu> {
                     context,
                     '${l10n.table} $i',
                     i.toString(),
-                    widget.selectedTableNumber == i.toString(),
+                    widget.selectedTableNumbers.contains(i.toString()),
                     Icons.table_restaurant_outlined,
                   ),
               ],
@@ -140,11 +144,19 @@ class _POSTableMenuState extends State<POSTableMenu> {
     IconData icon,
   ) {
     return InkWell(
-      onTap: () => widget.onTableSelected(isSelected ? null : value),
+      onTap: () {
+        final currentSelection = List<String>.from(widget.selectedTableNumbers);
+        if (isSelected) {
+          currentSelection.remove(value);
+        } else {
+          currentSelection.add(value);
+        }
+        widget.onTableSelected(currentSelection);
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.xs,
         ),
         color: isSelected
             ? AppColors.primary.withValues(alpha: 0.1)
@@ -153,21 +165,30 @@ class _POSTableMenuState extends State<POSTableMenu> {
           children: [
             Icon(
               icon,
-              size: 20,
+              size: 16,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
                 label,
-                style: AppTextStyles.bodyMedium.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: isSelected
                       ? AppColors.primary
                       : AppColors.textPrimary,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 12,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                size: 16,
+                color: AppColors.primary,
+              ),
           ],
         ),
       ),

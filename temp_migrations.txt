@@ -1,0 +1,442 @@
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add sales table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sales (
+          id TEXT PRIMARY KEY,
+          table_number TEXT,
+          total REAL NOT NULL,
+          payment_method TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      ''');
+
+      // Add sale items table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sale_items (
+          id TEXT PRIMARY KEY,
+          sale_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          item_name TEXT NOT NULL,
+          price REAL NOT NULL,
+          quantity INTEGER NOT NULL,
+          total REAL NOT NULL,
+          FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Add financial transactions table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS financial_transactions (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          amount REAL NOT NULL,
+          description TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      ''');
+
+      // Create indexes
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_financial_transactions_created_at ON financial_transactions(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_financial_transactions_type ON financial_transactions(type)');
+    }
+    
+    if (oldVersion < 3) {
+      // Add stock fields to items table
+      await _ensureStockColumnsExist(db);
+    }
+    
+    if (oldVersion < 4) {
+      // Add conversion_rate column to items table
+      try {
+        final result = await db.rawQuery("PRAGMA table_info(items)");
+        final hasConversionRate = result.any((row) => row['name'] == 'conversion_rate');
+        
+        if (!hasConversionRate) {
+          await db.execute('ALTER TABLE items ADD COLUMN conversion_rate REAL');
+        }
+      } catch (e) {
+        debugPrint('Error adding conversion_rate column: $e');
+        try {
+          await db.execute('ALTER TABLE items ADD COLUMN conversion_rate REAL');
+        } catch (e2) {
+          debugPrint('Error adding conversion_rate: $e2');
+        }
+      }
+    }
+    
+    if (oldVersion < 5) {
+      // Add is_pos_only column to items table
+      try {
+        final result = await db.rawQuery("PRAGMA table_info(items)");
+        final hasIsPosOnly = result.any((row) => row['name'] == 'is_pos_only');
+        
+        if (!hasIsPosOnly) {
+          await db.execute('ALTER TABLE items ADD COLUMN is_pos_only INTEGER NOT NULL DEFAULT 0');
+        }
+      } catch (e) {
+        debugPrint('Error adding is_pos_only column: $e');
+        try {
+          await db.execute('ALTER TABLE items ADD COLUMN is_pos_only INTEGER NOT NULL DEFAULT 0');
+        } catch (e2) {
+          debugPrint('Error adding is_pos_only: $e2');
+        }
+      }
+    }
+    
+    if (oldVersion < 6) {
+      // Add master-device sync support
+      await _addMasterDeviceSyncSupport(db);
+    }
+    
+    if (oldVersion < 7) {
+      // Add userId to masters table
+      await _addUserIdToMasters(db);
+    }
+    
+    if (oldVersion < 8) {
+      // Add local auth support (user_profiles and passwords)
+      await _addLocalAuthSupport(db);
+    }
+    
+    if (oldVersion < 9) {
+      // Add user permissions table
+      await _addUserPermissionsSupport(db);
+    }
+    
+    if (oldVersion < 10) {
+      // Remove role CHECK constraint to allow custom roles
+      await _updateRoleConstraint(db);
+    }
+    
+    if (oldVersion < 11) {
+      // Add discount and service charge columns to sales table
+      await _addDiscountAndServiceChargeToSales(db);
+    }
+    
+    if (oldVersion < 12) {
+      // Add delivery tax column to sales table
+      await _addDeliveryTaxToSales(db);
+    }
+    
+    if (oldVersion < 13) {
+      // Add hospitality tax column to sales table
+      await _addHospitalityTaxToSales(db);
+    }
+    
+    if (oldVersion < 14) {
+      // Add mac_address column to devices table
+      await _addMacAddressToDevices(db);
+    }
+    
+    if (oldVersion < 15) {
+      // Add floor column to devices table
+      await _addFloorToDevices(db);
+    }
+    
+    if (oldVersion < 16) {
+      // Add device_id column to sales table
+      await _addDeviceIdToSales(db);
+    }
+    
+    if (oldVersion < 17) {
+      // Add raw materials tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_materials (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          unit TEXT NOT NULL DEFAULT 'number',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS raw_material_batches (
+          id TEXT PRIMARY KEY,
+          raw_material_id TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          price REAL,
+          expiry_date TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_batches_raw_material_id ON raw_material_batches(raw_material_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_material_batches_expiry_date ON raw_material_batches(expiry_date)');
+    }
+    
+    if (oldVersion < 18) {
+      // Add recipes tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS recipes (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS recipe_ingredients (
+          id TEXT PRIMARY KEY,
+          recipe_id TEXT NOT NULL,
+          raw_material_id TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+          FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_recipes_item_id ON recipes(item_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_raw_material_id ON recipe_ingredients(raw_material_id)');
+    }
+    
+    if (oldVersion < 19) {
+      // Add reports tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shift_reports (
+          id TEXT PRIMARY KEY,
+          shift_id TEXT NOT NULL,
+          shift_start TEXT NOT NULL,
+          shift_end TEXT NOT NULL,
+          floor_id INTEGER,
+          device_id TEXT,
+          total_sales REAL NOT NULL DEFAULT 0.0,
+          cash_total REAL NOT NULL DEFAULT 0.0,
+          visa_total REAL NOT NULL DEFAULT 0.0,
+          orders_count INTEGER NOT NULL DEFAULT 0,
+          discounts REAL NOT NULL DEFAULT 0.0,
+          service REAL NOT NULL DEFAULT 0.0,
+          tax REAL NOT NULL DEFAULT 0.0,
+          created_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_movements (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL,
+          movement_type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          unit_price REAL,
+          total_value REAL,
+          reference_id TEXT,
+          reference_type TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          contact_person TEXT,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          balance REAL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS purchases (
+          id TEXT PRIMARY KEY,
+          invoice_number TEXT NOT NULL,
+          supplier_id TEXT NOT NULL,
+          supplier_invoice_number TEXT,
+          purchase_date TEXT NOT NULL,
+          payment_type TEXT NOT NULL DEFAULT 'cash',
+          total_amount REAL NOT NULL,
+          paid_amount REAL NOT NULL DEFAULT 0.0,
+          discount_amount REAL,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS purchase_items (
+          id TEXT PRIMARY KEY,
+          purchase_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          item_name TEXT NOT NULL,
+          unit TEXT NOT NULL DEFAULT 'number',
+          quantity REAL NOT NULL,
+          unit_price REAL NOT NULL,
+          discount REAL NOT NULL DEFAULT 0.0,
+          total REAL NOT NULL,
+          master_device_id TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+          FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create indexes
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_shift_id ON shift_reports(shift_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_floor_id ON shift_reports(floor_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_shift_start ON shift_reports(shift_start)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_master_device_id ON shift_reports(master_device_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_reports_sync_status ON shift_reports(sync_status)');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_item_id ON inventory_movements(item_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_movement_type ON inventory_movements(movement_type)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_created_at ON inventory_movements(created_at)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_reference_id ON inventory_movements(reference_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_movements_master_device_id ON inventory_movements(master_device_id)');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_suppliers_master_device_id ON suppliers(master_device_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_suppliers_sync_status ON suppliers(sync_status)');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_supplier_id ON purchases(supplier_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_purchase_date ON purchases(purchase_date)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_master_device_id ON purchases(master_device_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase_id ON purchase_items(purchase_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_purchase_items_item_id ON purchase_items(item_id)');
+    }
+    
+    if (oldVersion < 20) {
+      // Add new columns to purchases and purchase_items tables
+      await _addPurchaseInvoiceColumns(db);
+    }
+    
+    if (oldVersion < 21) {
+      // Add raw material categories and subcategories, update raw_materials table
+      await _addRawMaterialCategories(db);
+    }
+    
+    if (oldVersion < 22) {
+      // Restaurant Inventory, Recipe & Invoice Management System
+      await _addRestaurantInventorySystem(db);
+    }
+    
+    if (oldVersion < 23) {
+      // Make expiry_date optional in raw_material_batches
+      await _makeExpiryDateOptional(db);
+    }
+    
+    if (oldVersion < 24) {
+      // Add price column to raw_material_batches
+      await _addPriceToBatches(db);
+    }
+    
+    if (oldVersion < 25) {
+      // Update water base unit to carton
+      await _updateWaterBaseUnit(db);
+    }
+    
+    if (oldVersion < 26) {
+      // Ensure water base unit is carton (force update)
+      await _updateWaterBaseUnit(db);
+    }
+    
+    if (oldVersion < 27) {
+      // Add pending invoices table for multi-table support
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pending_invoices (
+          id TEXT PRIMARY KEY,
+          table_numbers TEXT NOT NULL,
+          items TEXT NOT NULL,
+          order_number TEXT,
+          discount_percentage REAL NOT NULL DEFAULT 0.0,
+          discount_amount REAL NOT NULL DEFAULT 0.0,
+          service_charge REAL NOT NULL DEFAULT 0.0,
+          delivery_tax REAL NOT NULL DEFAULT 0.0,
+          hospitality_tax REAL NOT NULL DEFAULT 0.0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          master_device_id TEXT NOT NULL,
+          FOREIGN KEY (master_device_id) REFERENCES masters(master_device_id) ON DELETE CASCADE
+        )
+      ''');
+      
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_invoices_table_numbers ON pending_invoices(table_numbers)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_invoices_master_device_id ON pending_invoices(master_device_id)');
+    }
+    
+    if (oldVersion < 28) {
+      // Migrate order_number to table_order_numbers (JSON)
+      await db.execute('ALTER TABLE pending_invoices ADD COLUMN table_order_numbers TEXT');
+      final pendingInvoices = await db.query('pending_invoices');
+      for (var invoice in pendingInvoices) {
+        // Handle order_number as it can be String or int
+        final oldOrderNumberValue = invoice['order_number'];
+        int? oldOrderNumber;
+        switch (oldOrderNumberValue) {
+          case null:
+            oldOrderNumber = null;
+            break;
+          case int():
+            oldOrderNumber = oldOrderNumberValue;
+            break;
+          case String():
+            oldOrderNumber = int.tryParse(oldOrderNumberValue);
+            break;
+          default:
+            oldOrderNumber = null;
+        }
+        
+        final tableNumbers = (invoice['table_numbers'] as String).split(',');
+        final Map<String, int> newTableOrderNumbers = {};
+        if (oldOrderNumber != null && tableNumbers.isNotEmpty) {
+          newTableOrderNumbers[tableNumbers.first] = oldOrderNumber;
+        }
+        await db.update(
+          'pending_invoices',
+          {'table_order_numbers': jsonEncode(newTableOrderNumbers)},
+          where: 'id = ?',
+          whereArgs: [invoice['id']],
+        );
+      }
+    }
+    
+    if (oldVersion < 29) {
+      // Update raw materials base units according to new rules
+      await _updateRawMaterialsBaseUnits(db);
+    }
+    
+    // Always run this migration to ensure all materials are updated
+    // This handles cases where the database was already at version 29 but materials weren't updated
+    await _updateRawMaterialsBaseUnits(db);
+    
+    if (oldVersion < 30) {
+      // Add soft drinks category and materials
+      await _addSoftDrinksCategory(db);
+    }
+    
+    if (oldVersion < 31) {
+      // Add milk subcategory to dairy category
+      await _addMilkSubCategory(db);
+    }
+  }

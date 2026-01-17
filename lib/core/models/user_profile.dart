@@ -15,21 +15,26 @@ class UserProfile {
     required this.updatedAt,
   });
 
-  /// Create from Map (Supabase response)
+  /// Create from Map (Database response)
   factory UserProfile.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic value) {
+      if (value == null || value.toString().isEmpty) return DateTime.now();
+      return DateTime.tryParse(value.toString()) ?? DateTime.now();
+    }
+
     return UserProfile(
-      userId: map['user_id'] as String,
-      username: map['username'] as String,
-      role: map['role'] as String,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      userId: (map['user_id'] ?? map['id'] ?? '') as String,
+      username: (map['username'] ?? '') as String,
+      role: (map['role'] ?? 'user') as String,
+      createdAt: parseDate(map['created_at']),
+      updatedAt: parseDate(map['updated_at'] ?? map['created_at']),
     );
   }
 
-  /// Convert to Map for Supabase
+  /// Convert to Map for Database
   Map<String, dynamic> toMap() {
     return {
-      'user_id': userId,
+      'id': userId,
       'username': username,
       'role': role,
       'created_at': createdAt.toIso8601String(),
@@ -81,4 +86,3 @@ class UsernameEmailConverter {
     return null;
   }
 }
-
