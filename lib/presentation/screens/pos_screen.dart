@@ -597,7 +597,7 @@ class _POSContentState extends State<_POSContent> {
                         });
                           await _savePendingInvoiceForTable(_activeTableNumber!);
                         }
-                        if (mounted) {
+                        if (context.mounted) {
                           context.read<CartBloc>().add(const ClearCart());
                         }
                       },

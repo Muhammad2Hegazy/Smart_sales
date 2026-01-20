@@ -459,24 +459,24 @@ extension DatabaseHelperRawMaterials on DatabaseHelper {
     // Convert int to double for calculations
     final quantityDouble = quantity.toDouble();
     final warnings = <LowStockWarning>[];
-    print('deductInventoryForSale called: itemId=$itemId, quantity=$quantity');
+    debugPrint('deductInventoryForSale called: itemId=$itemId, quantity=$quantity');
     final recipe = await getRecipeByItemId(itemId);
     if (recipe == null || recipe.ingredients.isEmpty) {
       // No recipe found, nothing to deduct
-      print('No recipe found for itemId=$itemId or recipe has no ingredients');
+      debugPrint('No recipe found for itemId=$itemId or recipe has no ingredients');
       return warnings;
     }
     
-    print('Recipe found for itemId=$itemId with ${recipe.ingredients.length} ingredients');
+    debugPrint('Recipe found for itemId=$itemId with ${recipe.ingredients.length} ingredients');
     
     // For each ingredient in the recipe, deduct the required quantity
     for (var ingredient in recipe.ingredients) {
       final requiredQuantity = ingredient.quantity * quantityDouble;
-      print('Processing ingredient: rawMaterialId=${ingredient.rawMaterialId}, quantityPerUnit=${ingredient.quantity}, totalRequired=$requiredQuantity');
+      debugPrint('Processing ingredient: rawMaterialId=${ingredient.rawMaterialId}, quantityPerUnit=${ingredient.quantity}, totalRequired=$requiredQuantity');
       
       // Get all batches for this raw material, ordered by expiry date (FIFO)
       final batches = await getRawMaterialBatches(ingredient.rawMaterialId);
-      print('Found ${batches.length} batches for raw material ${ingredient.rawMaterialId}');
+      debugPrint('Found ${batches.length} batches for raw material ${ingredient.rawMaterialId}');
       batches.sort((a, b) {
         if (a.expiryDate == null && b.expiryDate == null) return 0;
         if (a.expiryDate == null) return 1; // nulls go to end
@@ -495,13 +495,13 @@ extension DatabaseHelperRawMaterials on DatabaseHelper {
               ? batch.quantity 
               : remainingToDeduct;
           
-          print('Deducting $toDeduct from batch ${batch.id} (current quantity: ${batch.quantity})');
+          debugPrint('Deducting $toDeduct from batch ${batch.id} (current quantity: ${batch.quantity})');
           
           final newQuantity = batch.quantity - toDeduct;
           
           if (newQuantity <= 0) {
             // Delete batch if quantity becomes zero or negative
-            print('Deleting batch ${batch.id} (quantity would be $newQuantity)');
+            debugPrint('Deleting batch ${batch.id} (quantity would be $newQuantity)');
             await deleteRawMaterialBatch(batch.id);
           } else {
             // Update batch with new quantity
@@ -509,7 +509,7 @@ extension DatabaseHelperRawMaterials on DatabaseHelper {
               quantity: newQuantity,
               updatedAt: DateTime.now(),
             );
-            print('Updating batch ${batch.id} to quantity $newQuantity');
+            debugPrint('Updating batch ${batch.id} to quantity $newQuantity');
             await updateRawMaterialBatch(updatedBatch);
           }
           
@@ -518,13 +518,13 @@ extension DatabaseHelperRawMaterials on DatabaseHelper {
         }
       }
       
-      print('Total deducted: $totalDeducted, Remaining: $remainingToDeduct');
+      debugPrint('Total deducted: $totalDeducted, Remaining: $remainingToDeduct');
       
       // If we couldn't deduct all required quantity, log a warning
       if (remainingToDeduct > 0) {
-        print('Warning: Could not deduct full quantity for raw material ${ingredient.rawMaterialId}. Required: $requiredQuantity, Deducted: ${requiredQuantity - remainingToDeduct}');
+        debugPrint('Warning: Could not deduct full quantity for raw material ${ingredient.rawMaterialId}. Required: $requiredQuantity, Deducted: ${requiredQuantity - remainingToDeduct}');
       } else {
-        print('Successfully deducted $totalDeducted for raw material ${ingredient.rawMaterialId}');
+        debugPrint('Successfully deducted $totalDeducted for raw material ${ingredient.rawMaterialId}');
       }
       
       // Check for low stock after deduction
@@ -696,7 +696,7 @@ extension DatabaseHelperRawMaterials on DatabaseHelper {
       whereArgs: [rawMaterialId],
     );
     
-    print('Added $quantity $unit ($quantityInBaseUnit ${material.baseUnit}) to ${material.name}. New stock: $newStockQuantity');
+    debugPrint('Added $quantity $unit ($quantityInBaseUnit ${material.baseUnit}) to ${material.name}. New stock: $newStockQuantity');
   }
 
   /// Calculate and deduct stock for invoice items

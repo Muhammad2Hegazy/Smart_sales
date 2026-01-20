@@ -642,6 +642,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       bottlesPerCarton = (1.0 / bottleUnit.conversionFactorToBase).round();
     }
     
+    if (!context.mounted) return;
+    
     // Convert quantity from base unit to display unit when editing
     String initialQuantityText = '';
     if (batch != null) {
@@ -974,6 +976,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     
                     // Stock quantity is automatically recalculated in insertRawMaterialBatch
                   }
+
+                  if (!mounted) return;
 
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext);

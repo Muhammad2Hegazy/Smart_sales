@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';

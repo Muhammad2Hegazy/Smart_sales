@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' hide Category;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../l10n/app_localizations.dart';
@@ -310,8 +310,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        if (Navigator.canPop(context))
+        if (Navigator.canPop(context)) {
           Navigator.pop(context); // Remove loading if active
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -332,7 +333,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     );
     if (result == null || result.files.single.path == null) return;
 
-    // Manual individual CSV import implementation...
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
@@ -1263,6 +1264,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     Recipe? recipe = await dbHelper.getRecipeByItemId(item.id);
     final rawMaterials = await dbHelper.getAllRawMaterials();
 
+    if (!context.mounted) return;
     await showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -1380,6 +1382,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                         }
                       }
 
+                      if (!dialogContext.mounted) return;
                       // Add ingredient
                       await _showAddIngredientDialog(
                         dialogContext,

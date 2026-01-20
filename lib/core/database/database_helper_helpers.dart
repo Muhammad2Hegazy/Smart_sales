@@ -10,7 +10,7 @@ extension DatabaseHelperHelpers on DatabaseHelper {
     }
 
     final totalQuantity = material.totalQuantity;
-    print('formatStockForDisplay: ${material.name}, baseUnit: ${material.baseUnit}, totalQuantity: $totalQuantity');
+    debugPrint('formatStockForDisplay: ${material.name}, baseUnit: ${material.baseUnit}, totalQuantity: $totalQuantity');
     String quantityDisplay;
     String unitDisplay;
 
