@@ -94,7 +94,7 @@ class _POSCartFooterState extends State<POSCartFooter> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Summary Rows (Compact)
-              _buildSummaryRow(l10n.totalInvoice + ':', CurrencyFormatter.format(cartState.total)),
+              _buildSummaryRow('${l10n.totalInvoice}:', CurrencyFormatter.format(cartState.total)),
               if (widget.discountPercentage > 0)
                 _buildSummaryRow(
                   '${l10n.discount} (${widget.discountPercentage}%):',

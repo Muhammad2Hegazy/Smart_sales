@@ -12,6 +12,7 @@ class Item {
   final String stockUnit; // 'number', 'kg', 'packet'
   final double? conversionRate; // e.g., 1 kg = 80 cups (conversionRate = 80)
   final bool isPosOnly; // If true, item is only available in POS, not in inventory
+  final String? barcode;
 
   const Item({
     required this.id,
@@ -24,7 +25,9 @@ class Item {
     this.stockQuantity = 0.0,
     this.stockUnit = 'number',
     this.conversionRate,
+
     this.isPosOnly = false,
+    this.barcode,
   });
 
   bool get isInStock {
@@ -55,7 +58,9 @@ class Item {
     double? stockQuantity,
     String? stockUnit,
     double? conversionRate,
+
     bool? isPosOnly,
+    String? barcode,
   }) {
     // Safely get stockQuantity and stockUnit
     double finalStockQty;
@@ -80,7 +85,9 @@ class Item {
       stockQuantity: finalStockQty,
       stockUnit: finalStockUnit,
       conversionRate: conversionRate ?? this.conversionRate,
+
       isPosOnly: isPosOnly ?? this.isPosOnly,
+      barcode: barcode ?? this.barcode,
     );
   }
 
@@ -95,7 +102,9 @@ class Item {
       'stock_quantity': stockQuantity,
       'stock_unit': stockUnit,
       'conversion_rate': conversionRate,
+
       'is_pos_only': isPosOnly ? 1 : 0,
+      'barcode': barcode,
     };
   }
 
@@ -136,7 +145,9 @@ class Item {
       stockQuantity: stockQty,
       stockUnit: stockUnitValue,
       conversionRate: (map['conversion_rate'] as num?)?.toDouble(),
+
       isPosOnly: (map['is_pos_only'] as int? ?? 0) == 1,
+      barcode: map['barcode']?.toString(),
     );
   }
 }
