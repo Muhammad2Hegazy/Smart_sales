@@ -5,6 +5,12 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/database/database_helper.dart';
+import 'supplier_purchases_report.dart';
+import 'supplier_balances_report.dart';
+import 'supplier_account_statement.dart';
+import 'general_ledger_report.dart';
+import 'account_balances_report.dart';
+import 'income_statement_report.dart';
 
 class AccountsReportsTab extends StatefulWidget {
   const AccountsReportsTab({super.key});
@@ -36,23 +42,23 @@ class _AccountsReportsTabState extends State<AccountsReportsTab> with TickerProv
     try {
       final dbHelper = DatabaseHelper();
       final allDevices = await dbHelper.getAllDevices();
-      
+
       final floors = <int>{};
       for (var device in allDevices) {
         if (device.floor != null) {
           floors.add(device.floor!);
         }
       }
-      
+
       final sortedFloors = floors.toList()..sort();
-      
+
       if (mounted) {
         setState(() {
           _availableFloors = sortedFloors;
           final floorTabLength = sortedFloors.isEmpty ? 1 : sortedFloors.length + 1;
           _floorTabController?.dispose();
           _floorTabController = TabController(length: floorTabLength, vsync: this);
-          
+
           _floorTabController!.addListener(() {
             if (!_floorTabController!.indexIsChanging && mounted) {
               setState(() {
@@ -82,44 +88,39 @@ class _AccountsReportsTabState extends State<AccountsReportsTab> with TickerProv
 
     final accountsReports = [
       {
-        'title': l10n.customerAccountStatement,
-        'icon': Icons.description,
-        'onTap': () {},
-      },
-      {
-        'title': l10n.customerBalancesReport,
-        'icon': Icons.account_balance_wallet,
-        'onTap': () {},
-      },
-      {
         'title': l10n.supplierAccountStatement,
         'icon': Icons.receipt_long,
-        'onTap': () {},
+        'onTap': () => SupplierAccountStatement.show(context),
       },
       {
         'title': l10n.supplierBalancesReport,
         'icon': Icons.balance,
-        'onTap': () {},
+        'onTap': () => SupplierBalancesReport.show(context),
       },
       {
         'title': l10n.generalLedgerReport,
         'icon': Icons.book,
-        'onTap': () {},
+        'onTap': () => GeneralLedgerReport.show(context),
       },
       {
         'title': l10n.accountBalancesReport,
         'icon': Icons.account_balance,
-        'onTap': () {},
+        'onTap': () => AccountBalancesReport.show(context),
       },
       {
         'title': l10n.incomeStatementReport,
         'icon': Icons.trending_up,
-        'onTap': () {},
+        'onTap': () => IncomeStatementReport.show(context),
       },
       {
         'title': l10n.profitReportForPeriod,
         'icon': Icons.attach_money,
-        'onTap': () {},
+        'onTap': () => IncomeStatementReport.show(context),
+      },
+      {
+        'title': l10n.supplierPurchasesReport,
+        'icon': Icons.shopping_bag,
+        'onTap': () => SupplierPurchasesReport.show(context),
       },
     ];
 
@@ -190,4 +191,3 @@ class _AccountsReportsTabState extends State<AccountsReportsTab> with TickerProv
     );
   }
 }
-

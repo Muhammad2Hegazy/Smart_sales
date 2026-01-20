@@ -94,17 +94,16 @@ class CsvImporter {
       if (row.length < 12) continue;
 
       // REVISED MAPPING based on sample data analysis:
-      // Index 1: Long Item Identifier (e.g., 12020001)
-      // Index 2: SUB-CATEGORY ID (e.g., 1, 926, 927) <- This matches SC ID in sub_categories_import.csv
-      // Index 3: ITEM CODE / ID (e.g., 9999.0)
+      // Index 2: ITEM CODE / ID (كود الصنف)
+      // Index 3: BARCODE (باركود)
       // Index 4: ITEM NAME (اسم الصنف)
       // Index 5: STOCK UNIT (الوحده)
-      // Index 10: CATEGORY ID (e.g., 1.0) <- This correlates to Category ID, not SubCategory.
+      // Index 10: SUB-CATEGORY ID (النوع) <- This matches TypeID in sub_categories_import.csv
       // Index 11: UNIT PRICE (سعر الوحده)
 
-      final id = row[3].toString().trim().replaceAll('.0', '');
+      final id = row[2].toString().trim().replaceAll('.0', '');
       final name = row[4].toString().trim();
-      final subCategoryId = row[2].toString().trim().replaceAll(
+      final subCategoryId = row[10].toString().trim().replaceAll(
         '.0',
         '',
       ); // Correctly map to SubCategory
