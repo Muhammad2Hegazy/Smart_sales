@@ -2,6 +2,8 @@ import '../database/database_helper.dart';
 import '../models/sale.dart';
 import '../models/shift_report.dart';
 import '../models/inventory_movement.dart';
+import '../models/supplier.dart';
+import '../models/financial_transaction.dart';
 import 'package:uuid/uuid.dart';
 
 /// Reports Service

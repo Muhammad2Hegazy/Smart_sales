@@ -8,6 +8,7 @@ class FinancialTransaction {
   final TransactionType type;
   final double amount;
   final String description;
+  final String? notes;
   final DateTime createdAt;
 
   const FinancialTransaction({
@@ -15,6 +16,7 @@ class FinancialTransaction {
     required this.type,
     required this.amount,
     required this.description,
+    this.notes,
     required this.createdAt,
   });
 
@@ -24,6 +26,7 @@ class FinancialTransaction {
       'type': type == TransactionType.cashIn ? 'cash_in' : 'cash_out',
       'amount': amount,
       'description': description,
+      'notes': notes,
       'created_at': createdAt.toIso8601String(),
     };
     
@@ -47,6 +50,7 @@ class FinancialTransaction {
       type: map['type'] == 'cash_in' ? TransactionType.cashIn : TransactionType.cashOut,
       amount: (map['amount'] as num).toDouble(),
       description: map['description'] as String,
+      notes: map['notes'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

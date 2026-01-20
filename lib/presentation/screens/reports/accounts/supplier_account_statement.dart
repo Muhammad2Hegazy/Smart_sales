@@ -16,6 +16,7 @@ class SupplierAccountStatement {
     final l10n = AppLocalizations.of(context)!;
     final dbHelper = DatabaseHelper();
     final suppliers = await dbHelper.getAllSuppliers();
+    if (!context.mounted) return;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -74,7 +75,7 @@ class SupplierAccountStatement {
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Text(
-            '${l10n.supplier ?? 'المورد'}: ${supplier.name}',
+            '${l10n.supplier}: ${supplier.name}',
             style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
@@ -91,10 +92,10 @@ class SupplierAccountStatement {
               headingRowColor: WidgetStateProperty.all(AppColors.background),
               columns: [
                 DataColumn2(label: Text(l10n.date), size: ColumnSize.M),
-                DataColumn2(label: Text(l10n.invoiceNumber ?? 'رقم الفاتورة'), size: ColumnSize.M),
-                DataColumn2(label: Text(l10n.total ?? 'الإجمالي'), size: ColumnSize.S, textAlign: TextAlign.right),
-                DataColumn2(label: Text(l10n.paidAmount ?? 'المدفوع'), size: ColumnSize.S, textAlign: TextAlign.right),
-                DataColumn2(label: Text(l10n.balance ?? 'الرصيد'), size: ColumnSize.S, textAlign: TextAlign.right),
+                DataColumn2(label: Text(l10n.invoiceNumber), size: ColumnSize.M),
+                DataColumn2(label: Text(l10n.total), size: ColumnSize.S),
+                DataColumn2(label: Text(l10n.paidAmount), size: ColumnSize.S),
+                DataColumn2(label: Text(l10n.balance), size: ColumnSize.S),
               ],
               rows: statement.map((data) {
                 return DataRow(cells: [
@@ -136,9 +137,9 @@ class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<Supplier>(
-            value: _selectedSupplier,
+            initialValue: _selectedSupplier,
             isExpanded: true,
-            decoration: InputDecoration(labelText: widget.l10n.supplier ?? 'المورد'),
+            decoration: InputDecoration(labelText: widget.l10n.supplier),
             items: widget.suppliers.map((s) {
               return DropdownMenuItem(value: s, child: Text(s.name));
             }).toList(),
@@ -192,7 +193,7 @@ class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
                     'startDate': _startDate,
                     'endDate': _endDate,
                   }),
-          child: Text(widget.l10n.ok ?? 'موافق'),
+          child: Text(widget.l10n.ok),
         ),
       ],
     );

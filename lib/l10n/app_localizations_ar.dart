@@ -1681,4 +1681,25 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get deleteIngredient => 'حذف المكون';
+
+  @override
+  String get type => 'النوع';
+
+  @override
+  String get supplier => 'المورد';
+
+  @override
+  String get count => 'العدد';
+
+  @override
+  String get paidAmount => 'المبلغ المدفوع';
+
+  @override
+  String get unpaidAmount => 'المتبقي';
+
+  @override
+  String get totalPurchases => 'إجمالي المشتريات';
+
+  @override
+  String get totalQuantity => 'إجمالي الكمية';
 }

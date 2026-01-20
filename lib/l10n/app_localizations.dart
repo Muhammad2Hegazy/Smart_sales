@@ -3394,6 +3394,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete Ingredient'**
   String get deleteIngredient;
+
+  /// No description provided for @type.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get type;
+
+  /// No description provided for @supplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier'**
+  String get supplier;
+
+  /// No description provided for @count.
+  ///
+  /// In en, this message translates to:
+  /// **'Count'**
+  String get count;
+
+  /// No description provided for @paidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid Amount'**
+  String get paidAmount;
+
+  /// No description provided for @unpaidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpaid Amount'**
+  String get unpaidAmount;
+
+  /// No description provided for @totalPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Purchases'**
+  String get totalPurchases;
+
+  /// No description provided for @totalQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Quantity'**
+  String get totalQuantity;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/reports_service.dart';
 import '../../../../core/models/category.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -66,14 +64,12 @@ class InventoryByCategoryReport {
                   size: ColumnSize.L,
                 ),
                 DataColumn2(
-                  label: Text(l10n.totalQuantity ?? 'إجمالي الكمية', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.totalQuantity, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
-                  textAlign: TextAlign.center,
                 ),
                 DataColumn2(
-                  label: Text(l10n.totalValue ?? 'إجمالي القيمة', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.totalValue, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
-                  textAlign: TextAlign.right,
                 ),
               ],
               rows: reportData.map((data) {

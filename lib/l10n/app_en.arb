@@ -1173,5 +1173,19 @@
   "editIngredient": "Edit Ingredient",
   "@editIngredient": {},
   "deleteIngredient": "Delete Ingredient",
-  "@deleteIngredient": {}
+  "@deleteIngredient": {},
+  "type": "Type",
+  "@type": {},
+  "supplier": "Supplier",
+  "@supplier": {},
+  "count": "Count",
+  "@count": {},
+  "paidAmount": "Paid Amount",
+  "@paidAmount": {},
+  "unpaidAmount": "Unpaid Amount",
+  "@unpaidAmount": {},
+  "totalPurchases": "Total Purchases",
+  "@totalPurchases": {},
+  "totalQuantity": "Total Quantity",
+  "@totalQuantity": {}
 }

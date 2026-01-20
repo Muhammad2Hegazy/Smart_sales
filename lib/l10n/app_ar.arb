@@ -1175,5 +1175,19 @@
   "editIngredient": "تعديل المكون",
   "@editIngredient": {},
   "deleteIngredient": "حذف المكون",
-  "@deleteIngredient": {}
+  "@deleteIngredient": {},
+  "type": "النوع",
+  "@type": {},
+  "supplier": "المورد",
+  "@supplier": {},
+  "count": "العدد",
+  "@count": {},
+  "paidAmount": "المبلغ المدفوع",
+  "@paidAmount": {},
+  "unpaidAmount": "المتبقي",
+  "@unpaidAmount": {},
+  "totalPurchases": "إجمالي المشتريات",
+  "@totalPurchases": {},
+  "totalQuantity": "إجمالي الكمية",
+  "@totalQuantity": {}
 }

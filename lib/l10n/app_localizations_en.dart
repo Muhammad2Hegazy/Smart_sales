@@ -1681,4 +1681,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteIngredient => 'Delete Ingredient';
+
+  @override
+  String get type => 'Type';
+
+  @override
+  String get supplier => 'Supplier';
+
+  @override
+  String get count => 'Count';
+
+  @override
+  String get paidAmount => 'Paid Amount';
+
+  @override
+  String get unpaidAmount => 'Unpaid Amount';
+
+  @override
+  String get totalPurchases => 'Total Purchases';
+
+  @override
+  String get totalQuantity => 'Total Quantity';
 }

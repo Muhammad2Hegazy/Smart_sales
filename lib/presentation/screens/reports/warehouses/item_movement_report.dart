@@ -99,16 +99,15 @@ class ItemMovementReport {
                   size: ColumnSize.L,
                 ),
                 DataColumn2(
-                  label: Text(l10n.type ?? 'النوع', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.type, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
                 ),
                 DataColumn2(
                   label: Text(l10n.quantity, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.S,
-                  textAlign: TextAlign.center,
                 ),
                 DataColumn2(
-                  label: Text(l10n.notes ?? 'ملاحظات', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.notes),
                   size: ColumnSize.L,
                 ),
               ],
@@ -154,7 +153,7 @@ class _ItemMovementInputDialogState extends State<_ItemMovementInputDialog> {
           BlocBuilder<ProductBloc, ProductState>(
             builder: (context, state) {
               return DropdownButtonFormField<Item>(
-                value: _selectedItem,
+                initialValue: _selectedItem,
                 isExpanded: true,
                 decoration: InputDecoration(labelText: widget.l10n.item),
                 items: state.items.map((item) {
@@ -212,7 +211,7 @@ class _ItemMovementInputDialogState extends State<_ItemMovementInputDialog> {
                     'startDate': _startDate,
                     'endDate': _endDate,
                   }),
-          child: Text(widget.l10n.ok ?? 'موافق'),
+          child: Text(widget.l10n.ok),
         ),
       ],
     );
