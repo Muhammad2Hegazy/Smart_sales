@@ -1227,18 +1227,39 @@ class _ItemsScreenState extends State<ItemsScreen> {
                                 item.name,
                                 style: AppTextStyles.bodyLarge.copyWith(
                                   color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.bold,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                CurrencyFormatter.format(item.price),
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.sm,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+                                    ),
+                                    child: Text(
+                                      CurrencyFormatter.format(item.price),
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Text(
+                                    '#${item.id}',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

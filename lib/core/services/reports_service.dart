@@ -517,5 +517,132 @@ class ReportsService {
       'tax': tax,
     };
   }
+
+  /// Get supplier balances report
+  Future<List<Supplier>> getSupplierBalances() async {
+    return await _dbHelper.getAllSuppliers();
+  }
+
+  /// Get general ledger report
+  Future<List<FinancialTransaction>> getGeneralLedger({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    if (startDate != null && endDate != null) {
+      return await _dbHelper.getFinancialTransactionsByDateRange(startDate, endDate);
+    }
+    return await _dbHelper.getAllFinancialTransactions();
+  }
+
+  /// Get income statement data
+  Future<Map<String, double>> getIncomeStatement({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    // 1. Total Sales
+    final sales = await _dbHelper.getSalesByDateRange(startDate, endDate);
+    double totalSales = sales.fold(0.0, (sum, s) => sum + (s.total - s.discountAmount));
+
+    // 2. Total Purchases
+    final purchases = await _dbHelper.getAllPurchases(startDate: startDate, endDate: endDate);
+    double totalPurchases = purchases.fold(0.0, (sum, p) => sum + p.totalAmount);
+
+    // 3. Other Expenses
+    final cashOut = await _dbHelper.getTotalCashOutByDateRange(startDate, endDate);
+
+    // 4. Other Revenues
+    final cashIn = await _dbHelper.getTotalCashInByDateRange(startDate, endDate);
+
+    return {
+      'totalSales': totalSales,
+      'totalPurchases': totalPurchases,
+      'otherExpenses': cashOut,
+      'otherRevenues': cashIn,
+      'netProfit': totalSales + cashIn - totalPurchases - cashOut,
+    };
+  }
+
+  /// Get item sales trend (ItemByMovementReport)
+  Future<List<Map<String, dynamic>>> getItemSalesTrend({
+    required String itemId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final sales = await _dbHelper.getSalesByDateRange(startDate, endDate);
+    final Map<String, Map<String, dynamic>> dailyTrend = {};
+
+    for (var sale in sales) {
+      final dateKey = sale.createdAt.toIso8601String().substring(0, 10);
+      for (var saleItem in sale.items) {
+        if (saleItem.itemId == itemId) {
+          if (!dailyTrend.containsKey(dateKey)) {
+            dailyTrend[dateKey] = {
+              'date': DateTime.parse(dateKey),
+              'quantity': 0,
+              'totalSales': 0.0,
+            };
+          }
+          dailyTrend[dateKey]!['quantity'] = (dailyTrend[dateKey]!['quantity'] as int) + saleItem.quantity;
+          dailyTrend[dateKey]!['totalSales'] = (dailyTrend[dateKey]!['totalSales'] as double) + saleItem.total;
+        }
+      }
+    }
+
+    final result = dailyTrend.values.toList();
+    result.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+    return result;
+  }
+
+  /// Get supplier account statement
+  Future<List<Map<String, dynamic>>> getSupplierAccountStatement({
+    required String supplierId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final purchases = await _dbHelper.getPurchasesBySupplierId(
+      supplierId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+
+    return purchases.map((p) => {
+      'date': p.purchaseDate,
+      'invoiceNumber': p.invoiceNumber,
+      'total': p.totalAmount,
+      'paid': p.paidAmount,
+      'balance': p.totalAmount - p.paidAmount,
+      'notes': p.notes,
+    }).toList();
+  }
+
+  /// Get account balances (overview of financial position)
+  Future<Map<String, double>> getAccountBalances() async {
+    final now = DateTime.now();
+    final startOfYear = DateTime(now.year, 1, 1);
+
+    final sales = await _dbHelper.getSalesByDateRange(startOfYear, now);
+    double totalCashSales = 0;
+    double totalVisaSales = 0;
+    for (var s in sales) {
+      if (s.paymentMethod.toLowerCase() == 'cash') {
+        totalCashSales += s.total;
+      } else {
+        totalVisaSales += s.total;
+      }
+    }
+
+    final purchases = await _dbHelper.getAllPurchases(startDate: startOfYear, endDate: now);
+    double totalPurchases = purchases.fold(0.0, (sum, p) => sum + p.totalAmount);
+    double totalPaidToSuppliers = purchases.fold(0.0, (sum, p) => sum + p.paidAmount);
+
+    final cashIn = await _dbHelper.getTotalCashInByDateRange(startOfYear, now);
+    final cashOut = await _dbHelper.getTotalCashOutByDateRange(startOfYear, now);
+
+    return {
+      'cashInHand': totalCashSales + cashIn - totalPaidToSuppliers - cashOut,
+      'visaBalance': totalVisaSales,
+      'supplierDebts': totalPurchases - totalPaidToSuppliers,
+    };
+  }
 }
 

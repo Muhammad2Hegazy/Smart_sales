@@ -5,6 +5,12 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/database/database_helper.dart';
+import 'inventory_count_report.dart';
+import 'inventory_by_category_report.dart';
+import 'item_movement_report.dart';
+import 'item_by_movement_report.dart';
+import 'warehouse_movement_report.dart';
+import '../accounts/supplier_purchases_report.dart';
 
 class WarehousesReportsTab extends StatefulWidget {
   const WarehousesReportsTab({super.key});
@@ -36,23 +42,23 @@ class _WarehousesReportsTabState extends State<WarehousesReportsTab> with Ticker
     try {
       final dbHelper = DatabaseHelper();
       final allDevices = await dbHelper.getAllDevices();
-      
+
       final floors = <int>{};
       for (var device in allDevices) {
         if (device.floor != null) {
           floors.add(device.floor!);
         }
       }
-      
+
       final sortedFloors = floors.toList()..sort();
-      
+
       if (mounted) {
         setState(() {
           _availableFloors = sortedFloors;
           final floorTabLength = sortedFloors.isEmpty ? 1 : sortedFloors.length + 1;
           _floorTabController?.dispose();
           _floorTabController = TabController(length: floorTabLength, vsync: this);
-          
+
           _floorTabController!.addListener(() {
             if (!_floorTabController!.indexIsChanging && mounted) {
               setState(() {
@@ -84,32 +90,32 @@ class _WarehousesReportsTabState extends State<WarehousesReportsTab> with Ticker
       {
         'title': l10n.inventoryCount,
         'icon': Icons.inventory,
-        'onTap': () {},
+        'onTap': () => InventoryCountReport.show(context),
       },
       {
         'title': l10n.inventoryCountByCategory,
         'icon': Icons.category,
-        'onTap': () {},
+        'onTap': () => InventoryByCategoryReport.show(context),
       },
       {
         'title': l10n.itemMovementReport,
         'icon': Icons.swap_horiz,
-        'onTap': () {},
+        'onTap': () => ItemMovementReport.show(context),
       },
       {
         'title': l10n.itemByMovementReport,
         'icon': Icons.trending_up,
-        'onTap': () {},
+        'onTap': () => ItemByMovementReport.show(context),
       },
       {
         'title': l10n.warehouseMovementReport,
         'icon': Icons.warehouse,
-        'onTap': () {},
+        'onTap': () => WarehouseMovementReport.show(context),
       },
       {
         'title': l10n.supplierPurchasesReport,
         'icon': Icons.shopping_bag,
-        'onTap': () {},
+        'onTap': () => SupplierPurchasesReport.show(context),
       },
     ];
 
@@ -180,4 +186,3 @@ class _WarehousesReportsTabState extends State<WarehousesReportsTab> with Ticker
     );
   }
 }
-
