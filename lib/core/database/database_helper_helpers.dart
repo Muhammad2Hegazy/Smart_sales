@@ -10,7 +10,7 @@ extension DatabaseHelperHelpers on DatabaseHelper {
     }
 
     final totalQuantity = material.totalQuantity;
-    debugPrint('formatStockForDisplay: ${material.name}, baseUnit: ${material.baseUnit}, totalQuantity: $totalQuantity');
+    print('formatStockForDisplay: ${material.name}, baseUnit: ${material.baseUnit}, totalQuantity: $totalQuantity');
     String quantityDisplay;
     String unitDisplay;
 
@@ -115,5 +115,70 @@ extension DatabaseHelperHelpers on DatabaseHelper {
       'quantity': quantityDisplay,
       'unit': unitDisplay,
     };
+  }
+
+  /// Automatically import data from CSV files
+  Future<void> importDataFromCsv({
+    required String categoriesPath,
+    required String subCategoriesPath,
+    required String itemsPath,
+  }) async {
+    final result = await CsvImporter.importFromCsv(
+      categoriesPath: categoriesPath,
+      subCategoriesPath: subCategoriesPath,
+      itemsPath: itemsPath,
+    );
+
+    final db = await database;
+    final batch = db.batch();
+
+    // Get master device ID if exists
+    final masters = await db.query('masters');
+    final masterDeviceId = masters.isNotEmpty
+        ? masters.first['master_device_id'] as String
+        : '';
+    final now = DateTime.now().toIso8601String();
+
+    // 1. Categories
+    for (var cat in result.categories) {
+      batch.insert('categories', {
+        'id': cat.id,
+        'name': cat.name,
+        'master_device_id': masterDeviceId,
+        'sync_status': 'pending',
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    // 2. Subcategories
+    for (var sub in result.subCategories) {
+      batch.insert('sub_categories', {
+        'id': sub.id,
+        'category_id': sub.categoryId,
+        'name': sub.name,
+        'master_device_id': masterDeviceId,
+        'sync_status': 'pending',
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    // 3. Items
+    for (var item in result.items) {
+      batch.insert('items', {
+        'id': item.id,
+        'name': item.name,
+        'sub_category_id': item.subCategoryId,
+        'price': item.price,
+        'has_notes': 0,
+        'stock_quantity': 0.0,
+        'stock_unit': item.stockUnit,
+        'is_pos_only': item.isPosOnly ? 1 : 0,
+        'master_device_id': masterDeviceId,
+        'sync_status': 'pending',
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
   }
 }

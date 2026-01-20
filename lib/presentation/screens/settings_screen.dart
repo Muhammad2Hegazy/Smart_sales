@@ -38,7 +38,7 @@ import '../../core/models/user_profile.dart';
 import '../../core/models/device.dart';
 import '../../core/utils/mac_address_helper.dart';
 import 'package:printing/printing.dart';
-import '../main.dart';
+import '../../main.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

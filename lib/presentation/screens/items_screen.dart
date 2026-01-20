@@ -296,7 +296,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
       );
 
       if (context.mounted) {
-        if (Navigator.canPop(context)) Navigator.pop(context); // Remove loading
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context); // Remove loading
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Data imported successfully from "items" folder.'),

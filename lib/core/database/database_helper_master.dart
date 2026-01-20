@@ -157,51 +157,6 @@ extension DatabaseHelperMaster on DatabaseHelper {
 
   /// Ensure developer device is always registered
   /// Developer MAC: E0:0A:F6:C3:BA:FF
-  Future<void> _ensureDeveloperDeviceRegistered() async {
-    try {
-      const developerMacAddress = 'E0:0A:F6:C3:BA:FF';
-      
-      // Check if developer device already exists
-      final existingDevice = await getDeviceByMacAddress(developerMacAddress);
-      if (existingDevice != null) {
-        return; // Already registered
-      }
-
-      // Get or create master
-      final master = await getMaster();
-      String masterDeviceId;
-      
-      if (master == null) {
-        // Create a temporary master for developer device
-        // This will be updated when a user logs in
-        masterDeviceId = DateTime.now().millisecondsSinceEpoch.toString();
-        final newMaster = Master(
-          masterDeviceId: masterDeviceId,
-          masterName: 'Master Device',
-          userId: 'developer',
-          createdAt: DateTime.now(),
-        );
-        await insertMaster(newMaster);
-      } else {
-        masterDeviceId = master.masterDeviceId;
-      }
-      
-      // Register developer device
-      final device = Device(
-        deviceId: DateTime.now().millisecondsSinceEpoch.toString(),
-        deviceName: 'DEV',
-        masterDeviceId: masterDeviceId,
-        isMaster: false,
-        lastSeenAt: DateTime.now(),
-        macAddress: developerMacAddress,
-      );
-      await insertDevice(device);
-      debugPrint('Developer device registered: $developerMacAddress');
-    } catch (e) {
-      debugPrint('Error ensuring developer device registered: $e');
-    }
-  }
-
   // Sync status helpers
   Future<List<Map<String, dynamic>>> getPendingSyncRecords(String tableName, String masterDeviceId) async {
     final db = await database;

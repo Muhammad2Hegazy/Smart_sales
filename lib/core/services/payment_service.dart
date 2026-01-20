@@ -5,10 +5,10 @@ import '../models/cart_item.dart';
 import '../models/financial_transaction.dart';
 import '../models/low_stock_warning.dart';
 import '../database/database_helper.dart';
-import '../../bloc/sales/sales_bloc.dart';
-import '../../bloc/sales/sales_event.dart';
-import '../../bloc/financial/financial_bloc.dart';
-import '../../bloc/financial/financial_event.dart';
+import '../../presentation/blocs/sales/sales_bloc.dart';
+import '../../presentation/blocs/sales/sales_event.dart';
+import '../../presentation/blocs/financial/financial_bloc.dart';
+import '../../presentation/blocs/financial/financial_event.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Service class for handling payment processing
@@ -39,7 +39,7 @@ class PaymentService {
     // Create sale record
     final saleId = const Uuid().v4();
     final now = DateTime.now();
-    
+
     final saleItems = items.map((cartItem) {
       return SaleItem(
         id: const Uuid().v4(),
@@ -69,38 +69,38 @@ class PaymentService {
     // Save sale to database directly first (to ensure it's saved)
     final dbHelper = DatabaseHelper();
     await dbHelper.insertSale(sale);
-    
+
     // Save sale to database via BLoC (for state management)
     _salesBloc.add(AddSale(sale));
-    
+
     // Deduct inventory for each item in the sale and collect warnings
     final lowStockWarnings = <LowStockWarning>[];
     try {
       debugPrint('═══════════════════════════════════════════════════════');
       debugPrint('Starting inventory deduction for sale ${sale.id}');
       debugPrint('═══════════════════════════════════════════════════════');
-      
+
       for (var saleItem in saleItems) {
         debugPrint('');
         debugPrint('Processing item: ${saleItem.itemName}');
         debugPrint('  - Item ID: ${saleItem.itemId}');
         debugPrint('  - Quantity: ${saleItem.quantity}');
-        
+
         final recipe = await dbHelper.getRecipeByItemId(saleItem.itemId);
         if (recipe == null) {
           debugPrint('  ⚠️  WARNING: No recipe found for item "${saleItem.itemName}"');
           debugPrint('  → To enable inventory deduction, please add a recipe for this item in the Items screen');
           continue; // Skip this item
         }
-        
+
         if (recipe.ingredients.isEmpty) {
           debugPrint('  ⚠️  WARNING: Recipe found but has no ingredients');
           debugPrint('  → Please add ingredients to the recipe in the Items screen');
           continue; // Skip this item
         }
-        
+
         debugPrint('  ✓ Recipe found with ${recipe.ingredients.length} ingredient(s)');
-        
+
         // Deduct inventory and get warnings
         final warnings = await dbHelper.deductInventoryForSale(saleItem.itemId, saleItem.quantity);
         lowStockWarnings.addAll(warnings);
@@ -109,7 +109,7 @@ class PaymentService {
           debugPrint('  ⚠️  ${warnings.length} low stock warning(s) generated');
         }
       }
-      
+
       debugPrint('');
       debugPrint('═══════════════════════════════════════════════════════');
       debugPrint('Inventory deduction process completed for sale ${sale.id}');
@@ -123,10 +123,10 @@ class PaymentService {
       debugPrint('❌ ERROR deducting inventory for sale ${sale.id}: $e');
       debugPrint('Stack trace: $stackTrace');
     }
-    
+
     // Store warnings in sale object for later retrieval (we'll add a warnings field or return them separately)
     // For now, we'll return them via a callback or store them
-    
+
     // Record financial transaction (cash in)
     final transaction = FinancialTransaction(
       id: const Uuid().v4(),
@@ -136,8 +136,7 @@ class PaymentService {
       createdAt: now,
     );
     _financialBloc.add(AddFinancialTransaction(transaction));
-    
+
     return (sale: sale, warnings: lowStockWarnings);
   }
 }
-

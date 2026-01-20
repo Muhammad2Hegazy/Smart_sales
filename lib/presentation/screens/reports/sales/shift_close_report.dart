@@ -7,8 +7,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/invoice_printer.dart';
-import '../../../bloc/financial/financial_bloc.dart';
-import '../../../bloc/financial/financial_state.dart';
+import '../../../blocs/financial/financial_bloc.dart';
+import '../../../blocs/financial/financial_state.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/services/reports_service.dart';
 import '../../../../core/models/shift_report.dart';
@@ -543,6 +543,7 @@ class ShiftCloseReport {
       // Calculate previous balance
       double previousBalance = 0.0;
       try {
+    if (!context.mounted) return;
         final financialBloc = context.read<FinancialBloc>();
         final financialState = financialBloc.state;
         final transactionsBeforeShift = financialState.transactions

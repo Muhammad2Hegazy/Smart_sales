@@ -5,14 +5,14 @@ extension DatabaseHelperSales on DatabaseHelper {
   Future<void> insertSale(Sale sale) async {
     final db = await database;
     
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('insertSale: Starting to save sale');
-    debugPrint('  Sale ID: ${sale.id}');
-    debugPrint('  Total: ${sale.total}');
-    debugPrint('  Payment Method: ${sale.paymentMethod}');
-    debugPrint('  Created At: ${sale.createdAt.toIso8601String()}');
-    debugPrint('  Items Count: ${sale.items.length}');
-    debugPrint('═══════════════════════════════════════════════════════');
+    print('═══════════════════════════════════════════════════════');
+    print('insertSale: Starting to save sale');
+    print('  Sale ID: ${sale.id}');
+    print('  Total: ${sale.total}');
+    print('  Payment Method: ${sale.paymentMethod}');
+    print('  Created At: ${sale.createdAt.toIso8601String()}');
+    print('  Items Count: ${sale.items.length}');
+    print('═══════════════════════════════════════════════════════');
     
     // Ensure sales table has all required columns
     await _ensureSalesTableColumns(db);
@@ -27,13 +27,13 @@ extension DatabaseHelperSales on DatabaseHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       currentDeviceId = prefs.getString('current_device_id');
-      debugPrint('  Current Device ID from SharedPreferences: $currentDeviceId');
+      print('  Current Device ID from SharedPreferences: $currentDeviceId');
     } catch (e) {
-      debugPrint('  ⚠️  Error getting current device ID: $e');
+      print('  ⚠️  Error getting current device ID: $e');
     }
     
     final finalDeviceId = currentDeviceId ?? sale.deviceId;
-    debugPrint('  Final Device ID to save: $finalDeviceId');
+    print('  Final Device ID to save: $finalDeviceId');
     
     final batch = db.batch();
     
@@ -45,9 +45,9 @@ extension DatabaseHelperSales on DatabaseHelper {
       deviceId: finalDeviceId,
     );
     
-    debugPrint('  Sale Map Keys: ${saleMap.keys.toList()}');
-    debugPrint('  Sale Map device_id: ${saleMap['device_id']}');
-    debugPrint('  Sale Map created_at: ${saleMap['created_at']}');
+    print('  Sale Map Keys: ${saleMap.keys.toList()}');
+    print('  Sale Map device_id: ${saleMap['device_id']}');
+    print('  Sale Map created_at: ${saleMap['created_at']}');
     
     // Insert sale with sync fields and device_id
     batch.insert(
@@ -71,18 +71,18 @@ extension DatabaseHelperSales on DatabaseHelper {
     
     await batch.commit(noResult: true);
     
-    debugPrint('  ✓ Sale saved successfully to database');
-    debugPrint('═══════════════════════════════════════════════════════');
+    print('  ✓ Sale saved successfully to database');
+    print('═══════════════════════════════════════════════════════');
     
     // Verify the sale was saved
     final savedSale = await getSaleById(sale.id);
     if (savedSale != null) {
-      debugPrint('  ✓ Verification: Sale found in database');
-      debugPrint('    Saved Total: ${savedSale.total}');
-      debugPrint('    Saved Device ID: ${savedSale.deviceId}');
-      debugPrint('    Saved Created At: ${savedSale.createdAt.toIso8601String()}');
+      print('  ✓ Verification: Sale found in database');
+      print('    Saved Total: ${savedSale.total}');
+      print('    Saved Device ID: ${savedSale.deviceId}');
+      print('    Saved Created At: ${savedSale.createdAt.toIso8601String()}');
     } else {
-      debugPrint('  ❌ ERROR: Sale not found in database after save!');
+      print('  ❌ ERROR: Sale not found in database after save!');
     }
   }
 
@@ -120,7 +120,7 @@ extension DatabaseHelperSales on DatabaseHelper {
       final db = await database;
       final result = await db.rawQuery('SELECT COUNT(*) as count FROM sales');
       if (result.isEmpty) {
-        debugPrint('getSalesCount: No result returned');
+        print('getSalesCount: No result returned');
         return 0;
       }
       
@@ -135,11 +135,11 @@ extension DatabaseHelperSales on DatabaseHelper {
         count = int.tryParse(countValue.toString()) ?? 0;
       }
       
-      debugPrint('getSalesCount: Found $count sales in database (raw value: $countValue, type: ${countValue.runtimeType})');
+      print('getSalesCount: Found $count sales in database (raw value: $countValue, type: ${countValue.runtimeType})');
       return count;
     } catch (e, stackTrace) {
-      debugPrint('Error getting sales count: $e');
-      debugPrint('Stack trace: $stackTrace');
+      print('Error getting sales count: $e');
+      print('Stack trace: $stackTrace');
       return 0;
     }
   }
@@ -155,13 +155,13 @@ extension DatabaseHelperSales on DatabaseHelper {
       final todayStartStr = todayStart.toIso8601String();
       final todayEndStr = todayEnd.toIso8601String();
       
-      debugPrint('getTodaySalesCount: Querying sales from $todayStartStr to $todayEndStr');
+      print('getTodaySalesCount: Querying sales from $todayStartStr to $todayEndStr');
       
       // First, let's see all sales to debug
       final allSales = await db.query('sales', columns: ['id', 'created_at'], limit: 5);
-      debugPrint('getTodaySalesCount: Sample sales in DB:');
+      print('getTodaySalesCount: Sample sales in DB:');
       for (var sale in allSales) {
-        debugPrint('  - Sale ID: ${sale['id']}, created_at: ${sale['created_at']}');
+        print('  - Sale ID: ${sale['id']}, created_at: ${sale['created_at']}');
       }
       
       final result = await db.rawQuery(
@@ -170,7 +170,7 @@ extension DatabaseHelperSales on DatabaseHelper {
       );
       
       if (result.isEmpty) {
-        debugPrint('getTodaySalesCount: No result returned');
+        print('getTodaySalesCount: No result returned');
         return 0;
       }
       
@@ -185,7 +185,7 @@ extension DatabaseHelperSales on DatabaseHelper {
         count = int.tryParse(countValue.toString()) ?? 0;
       }
       
-      debugPrint('getTodaySalesCount: Found $count sales today (from $todayStartStr to $todayEndStr)');
+      print('getTodaySalesCount: Found $count sales today (from $todayStartStr to $todayEndStr)');
       
       // Also try a simpler query using DATE() function if available
       try {
@@ -202,21 +202,21 @@ extension DatabaseHelperSales on DatabaseHelper {
           } else {
             dateCount = int.tryParse(dateCountValue.toString()) ?? 0;
           }
-          debugPrint('getTodaySalesCount: Alternative query (DATE function) found $dateCount sales');
+          print('getTodaySalesCount: Alternative query (DATE function) found $dateCount sales');
           // Use the alternative if it gives a different result
           if (dateCount != count) {
-            debugPrint('getTodaySalesCount: Using alternative count: $dateCount');
+            print('getTodaySalesCount: Using alternative count: $dateCount');
             return dateCount;
           }
         }
       } catch (e) {
-        debugPrint('getTodaySalesCount: Alternative query failed (may not support DATE function): $e');
+        print('getTodaySalesCount: Alternative query failed (may not support DATE function): $e');
       }
       
       return count;
     } catch (e, stackTrace) {
-      debugPrint('Error getting today sales count: $e');
-      debugPrint('Stack trace: $stackTrace');
+      print('Error getting today sales count: $e');
+      print('Stack trace: $stackTrace');
       return 0;
     }
   }
@@ -225,7 +225,7 @@ extension DatabaseHelperSales on DatabaseHelper {
   Future<int> getNextInvoiceNumber() async {
     final count = await getTodaySalesCount();
     final nextNumber = count + 1;
-    debugPrint('getNextInvoiceNumber: Today count=$count, Next number=$nextNumber');
+    print('getNextInvoiceNumber: Today count=$count, Next number=$nextNumber');
     return nextNumber;
   }
 
@@ -238,21 +238,21 @@ extension DatabaseHelperSales on DatabaseHelper {
   Future<List<Sale>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
     final db = await database;
     
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('getSalesByDateRange: Querying sales');
-    debugPrint('  Start Date: ${startDate.toIso8601String()}');
-    debugPrint('  End Date: ${endDate.toIso8601String()}');
+    print('═══════════════════════════════════════════════════════');
+    print('getSalesByDateRange: Querying sales');
+    print('  Start Date: ${startDate.toIso8601String()}');
+    print('  End Date: ${endDate.toIso8601String()}');
     
     // First, let's check total sales count
     final totalCountResult = await db.rawQuery('SELECT COUNT(*) as count FROM sales');
     final totalCount = (totalCountResult.first['count'] as num?)?.toInt() ?? 0;
-    debugPrint('  Total sales in database: $totalCount');
+    print('  Total sales in database: $totalCount');
     
     // Get all sales to see what we have
     final allSalesMaps = await db.query('sales', limit: 5, orderBy: 'created_at DESC');
-    debugPrint('  Sample of all sales (last 5):');
+    print('  Sample of all sales (last 5):');
     for (var saleMap in allSalesMaps) {
-      debugPrint('    - ID: ${saleMap['id']}, Total: ${saleMap['total']}, Created: ${saleMap['created_at']}, Device: ${saleMap['device_id']}');
+      print('    - ID: ${saleMap['id']}, Total: ${saleMap['total']}, Created: ${saleMap['created_at']}, Device: ${saleMap['device_id']}');
     }
     
     final List<Map<String, dynamic>> saleMaps = await db.query(
@@ -262,11 +262,11 @@ extension DatabaseHelperSales on DatabaseHelper {
       orderBy: 'created_at DESC',
     );
     
-    debugPrint('  Found ${saleMaps.length} sales in date range');
+    print('  Found ${saleMaps.length} sales in date range');
     
     if (saleMaps.isEmpty) {
-      debugPrint('  ⚠️  WARNING: No sales found in date range!');
-      debugPrint('  Checking if any sales exist outside this range...');
+      print('  ⚠️  WARNING: No sales found in date range!');
+      print('  Checking if any sales exist outside this range...');
       final beforeCount = await db.rawQuery(
         'SELECT COUNT(*) as count FROM sales WHERE created_at < ?',
         [startDate.toIso8601String()],
@@ -275,8 +275,8 @@ extension DatabaseHelperSales on DatabaseHelper {
         'SELECT COUNT(*) as count FROM sales WHERE created_at > ?',
         [endDate.toIso8601String()],
       );
-      debugPrint('    Sales before range: ${(beforeCount.first['count'] as num?)?.toInt() ?? 0}');
-      debugPrint('    Sales after range: ${(afterCount.first['count'] as num?)?.toInt() ?? 0}');
+      print('    Sales before range: ${(beforeCount.first['count'] as num?)?.toInt() ?? 0}');
+      print('    Sales after range: ${(afterCount.first['count'] as num?)?.toInt() ?? 0}');
     }
     
     final List<Sale> sales = [];
@@ -286,8 +286,8 @@ extension DatabaseHelperSales on DatabaseHelper {
       sales.add(sale.copyWith(items: items));
     }
     
-    debugPrint('  Returning ${sales.length} sales with items');
-    debugPrint('═══════════════════════════════════════════════════════');
+    print('  Returning ${sales.length} sales with items');
+    print('═══════════════════════════════════════════════════════');
     
     return sales;
   }
@@ -303,14 +303,14 @@ extension DatabaseHelperSales on DatabaseHelper {
   ) async {
     final db = await database;
     
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('getSalesByDeviceIdsAndDateRange: Querying sales');
-    debugPrint('  Device IDs: $deviceIds (count: ${deviceIds.length})');
-    debugPrint('  Date range: ${startDate.toIso8601String()} to ${endDate.toIso8601String()}');
+    print('═══════════════════════════════════════════════════════');
+    print('getSalesByDeviceIdsAndDateRange: Querying sales');
+    print('  Device IDs: $deviceIds (count: ${deviceIds.length})');
+    print('  Date range: ${startDate.toIso8601String()} to ${endDate.toIso8601String()}');
     
     // If deviceIds is empty, get all sales in date range (including null device_id)
     if (deviceIds.isEmpty) {
-      debugPrint('  No device IDs provided, getting all sales in date range');
+      print('  No device IDs provided, getting all sales in date range');
       return await getSalesByDateRange(startDate, endDate);
     }
     
@@ -323,13 +323,13 @@ extension DatabaseHelperSales on DatabaseHelper {
       orderBy: 'created_at DESC',
     );
     
-    debugPrint('  Found ${saleMaps.length} sales matching device IDs');
+    print('  Found ${saleMaps.length} sales matching device IDs');
     
     // If no sales found with device IDs, get ALL sales in date range
     // This handles the case where device_id format doesn't match
     if (saleMaps.isEmpty) {
-      debugPrint('  ⚠️  No sales found with device IDs, getting ALL sales in date range');
-      debugPrint('  This ensures reports show all sales even if device_id format differs');
+      print('  ⚠️  No sales found with device IDs, getting ALL sales in date range');
+      print('  This ensures reports show all sales even if device_id format differs');
       return await getSalesByDateRange(startDate, endDate);
     }
     
@@ -340,8 +340,8 @@ extension DatabaseHelperSales on DatabaseHelper {
       sales.add(sale.copyWith(items: items));
     }
     
-    debugPrint('  Returning ${sales.length} sales with items');
-    debugPrint('═══════════════════════════════════════════════════════');
+    print('  Returning ${sales.length} sales with items');
+    print('═══════════════════════════════════════════════════════');
     
     return sales;
   }

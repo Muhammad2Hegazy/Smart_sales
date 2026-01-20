@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../bloc/sales/sales_bloc.dart';
-import '../../../bloc/product/product_bloc.dart';
-import '../../../bloc/financial/financial_bloc.dart';
+import '../../../blocs/sales/sales_bloc.dart';
+import '../../../blocs/product/product_bloc.dart';
+import '../../../blocs/financial/financial_bloc.dart';
 import '../../../../l10n/app_localizations.dart';
 
 class ReportDialog {
