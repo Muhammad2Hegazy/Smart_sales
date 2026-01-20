@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../l10n/app_localizations.dart';
-import '../core/theme/app_colors.dart';
-import '../core/theme/app_text_styles.dart';
-import '../core/theme/app_spacing.dart';
-import '../core/widgets/app_card.dart';
-import '../core/widgets/app_button.dart';
-import '../core/utils/currency_formatter.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../blocs/financial/financial_bloc.dart';
 import '../blocs/financial/financial_event.dart';
 import '../blocs/financial/financial_state.dart';
-import '../core/models/financial_transaction.dart';
-import '../core/database/database_helper.dart';
+import '../../core/models/financial_transaction.dart';
+import '../../core/database/database_helper.dart';
 
 class FinancialScreen extends StatefulWidget {
   const FinancialScreen({super.key});

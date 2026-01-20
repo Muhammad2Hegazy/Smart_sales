@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:async';
-import '../../models/user.dart';
+import '../../../data/models/user_model.dart';
 import '../../models/user_profile.dart';
 import '../../models/device.dart';
 import '../../models/master.dart';
@@ -15,7 +15,7 @@ class AuthLocalDataSource {
   static const String _keyCurrentUsername = 'auth_username';
   static const String _keyCurrentUserRole = 'auth_user_role';
   static const String _keyIsLoggedIn = 'auth_is_logged_in';
-  
+
   // Developer MAC address - always allowed
   static const String _developerMacAddress = 'E0:0A:F6:C3:BA:FF';
 
@@ -29,7 +29,7 @@ class AuthLocalDataSource {
     return digest.toString();
   }
 
-  Future<AppUser> signUp({
+  Future<UserModel> signUp({
     required String username,
     required String password,
     String? name,
@@ -61,14 +61,18 @@ class AuthLocalDataSource {
     await prefs.setString(_keyCurrentUserRole, role);
     await prefs.setBool(_keyIsLoggedIn, true);
 
-    return AppUser(
+    return UserModel(
       id: userId,
+      username: username,
       email: UsernameEmailConverter.usernameToEmail(username),
       name: name,
+      role: role,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
     );
   }
 
-  Future<AppUser> signIn({
+  Future<UserModel> signIn({
     required String username,
     required String password,
   }) async {
@@ -92,25 +96,25 @@ class AuthLocalDataSource {
     // STRICT: No fallbacks - MAC must be detected and must be developer MAC or registered device
     final currentMacAddress = await MacAddressHelper.getMacAddress();
     debugPrint('Detected MAC address: $currentMacAddress');
-    
+
     // If MAC address detection failed, deny login
     if (currentMacAddress == null || currentMacAddress.isEmpty) {
       debugPrint('MAC address detection failed - denying login');
       throw Exception('Device not authorized. MAC address could not be detected. Please contact administrator.');
     }
-    
+
     // Normalize MAC addresses for comparison (uppercase, standardize separators)
     final normalizedDetectedMac = currentMacAddress.toUpperCase()
         .replaceAll(RegExp(r'[\s\-]'), ':')
         .replaceAll(RegExp(r':+'), ':');
-    
+
     final normalizedDeveloperMac = _developerMacAddress.toUpperCase()
         .replaceAll(RegExp(r'[\s\-]'), ':')
         .replaceAll(RegExp(r':+'), ':');
-    
+
     debugPrint('Normalized detected MAC: $normalizedDetectedMac');
     debugPrint('Normalized developer MAC: $normalizedDeveloperMac');
-    
+
     // Check if it's the developer's MAC address
     bool isDeveloperMac = false;
     if (normalizedDetectedMac == normalizedDeveloperMac) {
@@ -118,7 +122,7 @@ class AuthLocalDataSource {
       debugPrint('Developer MAC detected, registering device...');
       await _ensureDeveloperDeviceRegistered(profile.userId);
     }
-    
+
     if (!isDeveloperMac) {
       // Not developer MAC - check if MAC address is registered in devices
       // Try both original format and normalized format
@@ -126,7 +130,7 @@ class AuthLocalDataSource {
       if (device == null && normalizedDetectedMac != currentMacAddress.toUpperCase()) {
         device = await _dbHelper.getDeviceByMacAddress(normalizedDetectedMac);
       }
-      
+
       if (device == null) {
         debugPrint('Device not found in database. MAC: $currentMacAddress');
         throw Exception('Device not authorized. Please contact administrator to register this device.');
@@ -140,10 +144,14 @@ class AuthLocalDataSource {
     await prefs.setString(_keyCurrentUserRole, profile.role);
     await prefs.setBool(_keyIsLoggedIn, true);
 
-    return AppUser(
+    return UserModel(
       id: profile.userId,
+      username: profile.username,
       email: UsernameEmailConverter.usernameToEmail(profile.username),
       name: null,
+      role: profile.role,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
     );
   }
 
@@ -159,7 +167,7 @@ class AuthLocalDataSource {
       // Get or create master
       final master = await _dbHelper.getMaster();
       String masterDeviceId;
-      
+
       if (master == null) {
         // Create master if it doesn't exist
         masterDeviceId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -173,7 +181,7 @@ class AuthLocalDataSource {
       } else {
         masterDeviceId = master.masterDeviceId;
       }
-      
+
       // Register developer device
       final device = Device(
         deviceId: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -197,7 +205,7 @@ class AuthLocalDataSource {
     await prefs.setBool(_keyIsLoggedIn, false);
   }
 
-  Future<AppUser?> getCurrentUser() async {
+  Future<UserModel?> getCurrentUser() async {
     try {
       debugPrint('Getting current user from SharedPreferences...');
       SharedPreferences? prefs;
@@ -213,7 +221,7 @@ class AuthLocalDataSource {
         debugPrint('SharedPreferences error: $e - returning null');
         return null;
       }
-      
+
       debugPrint('SharedPreferences obtained');
       final isLoggedIn = prefs.getBool(_keyIsLoggedIn) ?? false;
       if (!isLoggedIn) {
@@ -223,6 +231,7 @@ class AuthLocalDataSource {
 
       final userId = prefs.getString(_keyCurrentUserId);
       final username = prefs.getString(_keyCurrentUsername);
+      final role = prefs.getString(_keyCurrentUserRole) ?? 'user';
 
       if (userId == null || username == null) {
         debugPrint('User ID or username is null');
@@ -230,10 +239,12 @@ class AuthLocalDataSource {
       }
 
       debugPrint('User found: $username');
-      return AppUser(
+      return UserModel(
         id: userId,
+        username: username,
         email: UsernameEmailConverter.usernameToEmail(username),
         name: null,
+        role: role,
       );
     } catch (e) {
       debugPrint('Error getting current user: $e');
