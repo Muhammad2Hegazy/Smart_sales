@@ -28,6 +28,8 @@ import 'data/repositories/auth_repository_impl.dart';
 import 'domain/repositories/auth_repository.dart';
 import 'domain/repositories/product_repository.dart';
 import 'data/repositories/product_repository_impl.dart';
+import 'l10n/app_localizations.dart';
+import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -219,46 +221,54 @@ class SmartSalesAppState extends State<SmartSalesApp> {
             },
           ),
         ],
-        child: BlocListener<AuthBloc, AuthState>(
-          listener: (context, authState) {
-            // Only dispatch InitializeMaster once when authenticated
-            if (authState is AuthAuthenticated) {
-              context.read<DeviceBloc>().add(
-                InitializeMaster(userId: authState.user.id),
-              );
-            }
-          },
-          child: BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, authState) {
+        child: MaterialApp(
+          title: 'Smart Sales POS',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          locale: _locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: BlocListener<AuthBloc, AuthState>(
+            listener: (context, authState) {
+              // Only dispatch InitializeMaster once when authenticated
               if (authState is AuthAuthenticated) {
-                return const MainScreen();
-              } else if (authState is AuthUnauthenticated || authState is AuthInitial) {
-                // Show login screen for unauthenticated or initial state
-                return const LoginScreen();
-              } else if (authState is AuthError) {
-                // Show error or navigate to login
-                return Scaffold(
-                  body: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Authentication Error: ${authState.message}'),
-                        ElevatedButton(
-                          onPressed: () => context.read<AuthBloc>().add(const AuthCheckRequested()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
+                context.read<DeviceBloc>().add(
+                  InitializeMaster(userId: authState.user.id),
                 );
               }
-              // Show loading screen while checking auth status (AuthLoading)
-              return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
             },
+            child: BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, authState) {
+                if (authState is AuthAuthenticated) {
+                  return const MainScreen();
+                } else if (authState is AuthUnauthenticated || authState is AuthInitial) {
+                  // Show login screen for unauthenticated or initial state
+                  return const LoginScreen();
+                } else if (authState is AuthError) {
+                  // Show error or navigate to login
+                  return Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Authentication Error: ${authState.message}'),
+                          ElevatedButton(
+                            onPressed: () => context.read<AuthBloc>().add(const AuthCheckRequested()),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                // Show loading screen while checking auth status (AuthLoading)
+                return const Scaffold(
+                  body: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
