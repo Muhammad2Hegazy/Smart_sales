@@ -181,4 +181,59 @@ extension DatabaseHelperHelpers on DatabaseHelper {
 
     await batch.commit(noResult: true);
   }
+
+  /// Automatically import inventory data (raw materials) from CSV files
+  Future<void> importInventoryFromCsv({
+    required String categoriesPath,
+    required String subCategoriesPath,
+    required String rawMaterialsPath,
+  }) async {
+    final result = await CsvImporter.importInventoryFromCsv(
+      categoriesPath: categoriesPath,
+      subCategoriesPath: subCategoriesPath,
+      rawMaterialsPath: rawMaterialsPath,
+    );
+
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
+
+    // 1. Raw Material Categories
+    for (var cat in result.categories) {
+      batch.insert('raw_material_categories', {
+        'id': cat.id,
+        'name': cat.name,
+        'created_at': cat.createdAt.toIso8601String(),
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    // 2. Raw Material Subcategories
+    for (var sub in result.subCategories) {
+      batch.insert('raw_material_sub_categories', {
+        'id': sub.id,
+        'category_id': sub.categoryId,
+        'name': sub.name,
+        'created_at': sub.createdAt.toIso8601String(),
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    // 3. Raw Materials
+    for (var material in result.rawMaterials) {
+      batch.insert('raw_materials', {
+        'id': material.id,
+        'name': material.name,
+        'sub_category_id': material.subCategoryId,
+        'unit': material.unit,
+        'base_unit': material.baseUnit,
+        'stock_quantity': material.stockQuantity,
+        'minimum_alert_quantity': material.minimumAlertQuantity,
+        'created_at': material.createdAt.toIso8601String(),
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await batch.commit(noResult: true);
+  }
 }

@@ -63,6 +63,24 @@ class _ItemsScreenState extends State<ItemsScreen> {
           );
         }
       }
+
+      // Also Sync Inventory
+      final inventoryDir = Directory('inventory');
+      if (inventoryDir.existsSync()) {
+        final rawCatPath = p.join('inventory', 'raw_material_categories_import.csv');
+        final rawSubCatPath = p.join('inventory', 'raw_material_sub_categories_import.csv');
+        final rawMaterialsPath = p.join('inventory', 'raw_materials_import.csv');
+
+        if (File(rawCatPath).existsSync() ||
+            File(rawSubCatPath).existsSync() ||
+            File(rawMaterialsPath).existsSync()) {
+          await DatabaseHelper().importInventoryFromCsv(
+            categoriesPath: rawCatPath,
+            subCategoriesPath: rawSubCatPath,
+            rawMaterialsPath: rawMaterialsPath,
+          );
+        }
+      }
     } catch (e) {
       debugPrint('Silent auto-import error: $e');
     } finally {

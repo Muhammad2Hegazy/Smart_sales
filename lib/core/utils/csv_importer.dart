@@ -5,6 +5,10 @@ import '../models/category.dart';
 import '../models/sub_category.dart';
 import '../models/item.dart';
 import '../models/import_result.dart';
+import '../models/raw_material.dart';
+import '../models/raw_material_category.dart';
+import '../models/raw_material_sub_category.dart';
+import '../models/inventory_import_result.dart';
 
 class CsvImporter {
   static Future<ImportResult> importFromCsv({
@@ -21,6 +25,22 @@ class CsvImporter {
       categories: categories,
       subCategories: subCategories,
       items: items,
+    );
+  }
+
+  static Future<InventoryImportResult> importInventoryFromCsv({
+    required String categoriesPath,
+    required String subCategoriesPath,
+    required String rawMaterialsPath,
+  }) async {
+    final categories = await _importRawMaterialCategories(categoriesPath);
+    final subCategories = await _importRawMaterialSubCategories(subCategoriesPath);
+    final rawMaterials = await _importRawMaterials(rawMaterialsPath);
+
+    return InventoryImportResult(
+      categories: categories,
+      subCategories: subCategories,
+      rawMaterials: rawMaterials,
     );
   }
 
@@ -126,5 +146,164 @@ class CsvImporter {
       );
     }
     return items;
+  }
+
+  static Future<List<RawMaterialCategory>> _importRawMaterialCategories(String filePath) async {
+    if (!File(filePath).existsSync()) return [];
+    final bytes = await File(filePath).readAsBytes();
+    final content = utf8.decode(bytes, allowMalformed: true);
+    final fields = const CsvToListConverter().convert(content);
+
+    if (fields.isEmpty) return [];
+
+    final categories = <RawMaterialCategory>[];
+    final now = DateTime.now();
+    // Skip header
+    for (var i = 1; i < fields.length; i++) {
+      final row = fields[i];
+      if (row.length < 2) continue;
+
+      final id = row[0].toString().trim().replaceAll('.0', '');
+      final name = row[1].toString().trim();
+
+      if (id.isEmpty || name.isEmpty) continue;
+
+      categories.add(RawMaterialCategory(
+        id: id,
+        name: name,
+        createdAt: now,
+        updatedAt: now,
+      ));
+    }
+    return categories;
+  }
+
+  static Future<List<RawMaterialSubCategory>> _importRawMaterialSubCategories(String filePath) async {
+    if (!File(filePath).existsSync()) return [];
+    final bytes = await File(filePath).readAsBytes();
+    final content = utf8.decode(bytes, allowMalformed: true);
+    final fields = const CsvToListConverter().convert(content);
+
+    if (fields.isEmpty) return [];
+
+    final subCategories = <RawMaterialSubCategory>[];
+    final now = DateTime.now();
+    // Skip header
+    for (var i = 1; i < fields.length; i++) {
+      final row = fields[i];
+      if (row.length < 3) continue;
+
+      final id = row[0].toString().trim().replaceAll('.0', '');
+      final categoryId = row[1].toString().trim().replaceAll('.0', '');
+      final name = row[2].toString().trim();
+
+      if (id.isEmpty || name.isEmpty) continue;
+
+      subCategories.add(
+        RawMaterialSubCategory(
+          id: id,
+          categoryId: categoryId,
+          name: name,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    }
+    return subCategories;
+  }
+
+  static Future<List<RawMaterial>> _importRawMaterials(String filePath) async {
+    if (!File(filePath).existsSync()) return [];
+    final bytes = await File(filePath).readAsBytes();
+    final content = utf8.decode(bytes, allowMalformed: true);
+    final fields = const CsvToListConverter().convert(content);
+
+    if (fields.isEmpty) return [];
+
+    final rawMaterials = <RawMaterial>[];
+    final now = DateTime.now();
+    // Skip header
+    for (var i = 1; i < fields.length; i++) {
+      final row = fields[i];
+      if (row.length < 6) continue;
+
+      // Expected columns: id, name, subCategoryId, unit, baseUnit, minimumAlertQuantity
+      final id = row[0].toString().trim().replaceAll('.0', '');
+      final name = row[1].toString().trim();
+      final subCategoryId = row[2].toString().trim().replaceAll('.0', '');
+      final unit = row[3].toString().trim();
+      final baseUnit = row[4].toString().trim();
+      final minAlertQtyStr = row[5].toString().trim();
+      final minAlertQty = double.tryParse(minAlertQtyStr) ?? 0.0;
+
+      if (id.isEmpty || name.isEmpty) continue;
+
+      rawMaterials.add(
+        RawMaterial(
+          id: id,
+          name: name,
+          subCategoryId: subCategoryId,
+          unit: unit,
+          baseUnit: baseUnit,
+          minimumAlertQuantity: minAlertQty,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    }
+    return rawMaterials;
+  }
+
+  static Future<String> exportInventoryToCsv(List<RawMaterial> materials) async {
+    final List<List<dynamic>> rows = [];
+    
+    // Add header
+    rows.add([
+      'id',
+      'name',
+      'subCategoryId',
+      'unit',
+      'baseUnit',
+      'minimumAlertQuantity'
+    ]);
+
+    for (var material in materials) {
+      rows.add([
+        material.id,
+        material.name,
+        material.subCategoryId,
+        material.unit,
+        material.baseUnit,
+        material.minimumAlertQuantity,
+      ]);
+    }
+
+    return const ListToCsvConverter().convert(rows);
+  }
+
+  static Future<String> exportRawMaterialCategoriesToCsv(List<RawMaterialCategory> categories) async {
+    final List<List<dynamic>> rows = [];
+    
+    // Add header
+    rows.add(['id', 'name']);
+
+    for (var cat in categories) {
+      rows.add([cat.id, cat.name]);
+    }
+
+    return const ListToCsvConverter().convert(rows);
+  }
+
+  static Future<String> exportRawMaterialSubCategoriesToCsv(List<RawMaterialSubCategory> subCategories) async {
+    final List<List<dynamic>> rows = [];
+    
+    // Add header
+    rows.add(['id', 'categoryId', 'name']);
+
+    for (var sub in subCategories) {
+      rows.add([sub.id, sub.categoryId, sub.name]);
+    }
+
+    return const ListToCsvConverter().convert(rows);
   }
 }

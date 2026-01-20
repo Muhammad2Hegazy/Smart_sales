@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:intl/intl.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../l10n/app_localizations.dart';
@@ -13,6 +15,8 @@ import '../../core/models/raw_material_sub_category.dart';
 import '../../core/models/raw_material_unit.dart';
 import '../../core/database/database_helper.dart';
 import 'package:uuid/uuid.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../core/utils/csv_importer.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -30,7 +34,34 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _performSilentAutoImport();
+  }
+
+  Future<void> _performSilentAutoImport() async {
+    try {
+      final inventoryDir = Directory('inventory');
+      if (inventoryDir.existsSync()) {
+        final rawCatPath = p.join('inventory', 'raw_material_categories_import.csv');
+        final rawSubCatPath = p.join('inventory', 'raw_material_sub_categories_import.csv');
+        final rawMaterialsPath = p.join('inventory', 'raw_materials_import.csv');
+
+        if (File(rawCatPath).existsSync() ||
+            File(rawSubCatPath).existsSync() ||
+            File(rawMaterialsPath).existsSync()) {
+          await DatabaseHelper().importInventoryFromCsv(
+            categoriesPath: rawCatPath,
+            subCategoriesPath: rawSubCatPath,
+            rawMaterialsPath: rawMaterialsPath,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Silent auto-import inventory error: $e');
+    } finally {
+      if (mounted) {
+        _loadData();
+      }
+    }
   }
 
   Future<void> _loadData() async {
@@ -103,6 +134,38 @@ class _InventoryScreenState extends State<InventoryScreen> {
       appBar: AppBar(
         title: Text(l10n.inventory),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            child: ElevatedButton.icon(
+              onPressed: () => _showImportInventoryDialog(context, l10n),
+              icon: const Icon(Icons.upload_file, size: 18),
+              label: const Text('استيراد'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            child: ElevatedButton.icon(
+              onPressed: () => _handleExportInventory(context, l10n),
+              icon: const Icon(Icons.download, size: 18),
+              label: const Text('تصدير'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
@@ -1012,5 +1075,187 @@ class _InventoryScreenState extends State<InventoryScreen> {
     priceController.dispose();
   }
 
-}
+  Future<void> _showImportInventoryDialog(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('استيراد المخزون من CSV'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Import from 'inventory' Folder
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  await _handleImportFromInventoryFolder(context, l10n);
+                },
+                icon: const Icon(Icons.folder_shared, size: 20),
+                label: const Text('استيراد من مجلد "inventory"'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Future<void> _handleImportFromInventoryFolder(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
+    try {
+      final inventoryDir = Directory('inventory');
+      if (!inventoryDir.existsSync()) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تعذر العثور على مجلد "inventory" في مسار المشروع.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      final rawCatPath = p.join('inventory', 'raw_material_categories_import.csv');
+      final rawSubCatPath = p.join('inventory', 'raw_material_sub_categories_import.csv');
+      final rawMaterialsPath = p.join('inventory', 'raw_materials_import.csv');
+
+      if (!File(rawCatPath).existsSync() &&
+          !File(rawSubCatPath).existsSync() &&
+          !File(rawMaterialsPath).existsSync()) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ملفات CSV غير موجودة في مجلد "inventory".'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      await DatabaseHelper().importInventoryFromCsv(
+        categoriesPath: rawCatPath,
+        subCategoriesPath: rawSubCatPath,
+        rawMaterialsPath: rawMaterialsPath,
+      );
+
+      if (context.mounted) {
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context); // Remove loading
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم استيراد بيانات المخزون بنجاح.'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+        _loadData();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context); // Remove loading if active
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleExportInventory(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final categories = await dbHelper.getAllRawMaterialCategories();
+      final subCategories = await dbHelper.getAllRawMaterialSubCategories();
+      final materials = await dbHelper.getAllRawMaterials();
+
+      if (materials.isEmpty && categories.isEmpty && subCategories.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('لا توجد بيانات لتصديرها.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      final materialsCsv = await CsvImporter.exportInventoryToCsv(materials);
+      final categoriesCsv = await CsvImporter.exportRawMaterialCategoriesToCsv(categories);
+      final subCategoriesCsv = await CsvImporter.exportRawMaterialSubCategoriesToCsv(subCategories);
+
+      String? result = await FilePicker.platform.saveFile(
+        dialogTitle: 'اختر مكان حفظ ملف المواد الخام',
+        fileName: 'raw_materials_export.csv',
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result != null) {
+        final path = result.endsWith('.csv') ? result : '$result.csv';
+        await File(path).writeAsString(materialsCsv);
+        
+        // Also save categories and subcategories in the same directory
+        final directory = p.dirname(path);
+        await File(p.join(directory, 'raw_material_categories_export.csv')).writeAsString(categoriesCsv);
+        await File(p.join(directory, 'raw_material_sub_categories_export.csv')).writeAsString(subCategoriesCsv);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تصدير البيانات بنجاح.'),
+              backgroundColor: Colors.teal,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ أثناء التصدير: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+}

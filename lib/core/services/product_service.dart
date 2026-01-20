@@ -33,8 +33,9 @@ class ProductService {
     // Access database to trigger lazy initialization
     await _dbHelper.database;
 
-    // Silent Auto-Sync from CSV project folder
+    // Silent Auto-Sync from CSV project folders
     await autoSyncCsv();
+    await autoSyncInventoryCsv();
 
     await loadFromDatabase();
     _isInitialized = true;
@@ -59,6 +60,28 @@ class ProductService {
       }
     } catch (e) {
       debugPrint('ProductService: Silent auto-sync error: $e');
+    }
+  }
+
+  /// Automatically import from project 'inventory' folder if files exist
+  Future<void> autoSyncInventoryCsv() async {
+    try {
+      const categoriesPath = 'inventory/raw_material_categories_import.csv';
+      const subCategoriesPath = 'inventory/raw_material_sub_categories_import.csv';
+      const rawMaterialsPath = 'inventory/raw_materials_import.csv';
+
+      if (File(categoriesPath).existsSync() ||
+          File(subCategoriesPath).existsSync() ||
+          File(rawMaterialsPath).existsSync()) {
+        debugPrint('ProductService: Auto-syncing Inventory CSV data...');
+        await _dbHelper.importInventoryFromCsv(
+          categoriesPath: categoriesPath,
+          subCategoriesPath: subCategoriesPath,
+          rawMaterialsPath: rawMaterialsPath,
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductService: Silent auto-sync inventory error: $e');
     }
   }
 

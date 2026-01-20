@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
@@ -265,6 +266,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Import raw materials from Excel. These will appear in inventory.',
             Icons.inventory_2_outlined,
             () => _handleImportRawMaterials(context, l10n),
+          ),
+          _buildDivider(),
+          _buildListTile(
+            'تصدير المخزون',
+            'Export raw material inventory to CSV.',
+            Icons.download_outlined,
+            () => _handleExportRawMaterials(context, l10n),
           ),
         ]),
       ],
@@ -1544,6 +1552,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleExportRawMaterials(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final categories = await dbHelper.getAllRawMaterialCategories();
+      final subCategories = await dbHelper.getAllRawMaterialSubCategories();
+      final materials = await dbHelper.getAllRawMaterials();
+
+      if (materials.isEmpty && categories.isEmpty && subCategories.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No inventory data to export.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      final materialsCsv = await CsvImporter.exportInventoryToCsv(materials);
+      final categoriesCsv = await CsvImporter.exportRawMaterialCategoriesToCsv(categories);
+      final subCategoriesCsv = await CsvImporter.exportRawMaterialSubCategoriesToCsv(subCategories);
+
+      String? result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Select location to save Inventory CSV',
+        fileName: 'raw_materials_export.csv',
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result != null) {
+        final path = result.endsWith('.csv') ? result : '$result.csv';
+        await File(path).writeAsString(materialsCsv);
+
+        // Also save categories and subcategories in the same directory
+        final directory = p.dirname(path);
+        await File(p.join(directory, 'raw_material_categories_export.csv'))
+            .writeAsString(categoriesCsv);
+        await File(p.join(directory, 'raw_material_sub_categories_export.csv'))
+            .writeAsString(subCategoriesCsv);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Inventory exported successfully.'),
+              backgroundColor: Colors.teal,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting inventory: $e'),
             backgroundColor: AppColors.error,
           ),
         );
