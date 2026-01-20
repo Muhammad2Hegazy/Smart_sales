@@ -7,7 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../blocs/product/product_bloc.dart';
 import '../../../blocs/product/product_state.dart';
 
-/// SubCategories menu widget for POS screen
+/// SubCategories menu widget for POS screen (Horizontal version)
 class POSSubCategoriesMenu extends StatelessWidget {
   final String? selectedCategoryId;
   final String? selectedSubCategoryId;
@@ -22,12 +22,10 @@ class POSSubCategoriesMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    
     if (selectedCategoryId == null) {
       return const SizedBox.shrink();
     }
-    
+
     return BlocBuilder<ProductBloc, ProductState>(
       builder: (context, productState) {
         final subCategories = productState.subCategories
@@ -35,130 +33,47 @@ class POSSubCategoriesMenu extends StatelessWidget {
             .toList();
 
         if (subCategories.isEmpty) {
-          return Container(
-            width: 160,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border(
-                right: BorderSide(color: AppColors.border),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                l10n.noSubcategories,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         return Container(
-          width: 160,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border(
-              right: BorderSide(color: AppColors.border),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: const BoxDecoration(
-                  color: AppColors.secondary,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.folder,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        l10n.subCategory,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: subCategories.length,
-                  itemBuilder: (context, index) {
-                    final subCategory = subCategories[index];
-                    final isSelected = selectedSubCategoryId == subCategory.id;
-                    return InkWell(
-                      onTap: () => onSubCategorySelected(
-                        isSelected ? null : subCategory.id,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs,
-                          vertical: AppSpacing.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.secondary.withValues(alpha: 0.1)
-                              : Colors.transparent,
-                          border: Border(
-                            left: BorderSide(
-                              color: isSelected
-                                  ? AppColors.secondary
-                                  : Colors.transparent,
-                              width: 3,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                subCategory.name,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: isSelected
-                                      ? AppColors.secondary
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  fontSize: 12,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isSelected)
-                              const Icon(
-                                Icons.chevron_right,
-                                color: AppColors.secondary,
-                                size: 16,
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
+          height: 40,
+          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: subCategories.length,
+            itemBuilder: (context, index) {
+              final subCategory = subCategories[index];
+              final isSelected = selectedSubCategoryId == subCategory.id;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.sm),
+                child: FilterChip(
+                  label: Text(subCategory.name),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    onSubCategorySelected(selected ? subCategory.id : null);
                   },
+                  selectedColor: AppColors.secondary.withValues(alpha: 0.2),
+                  checkmarkColor: AppColors.secondary,
+                  labelStyle: AppTextStyles.bodySmall.copyWith(
+                    color: isSelected ? AppColors.secondary : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 12,
+                  ),
+                  backgroundColor: AppColors.background,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    side: BorderSide(
+                      color: isSelected ? AppColors.secondary : AppColors.border,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         );
       },
     );
   }
 }
-

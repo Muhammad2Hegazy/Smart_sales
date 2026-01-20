@@ -5,164 +5,94 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/models/item.dart';
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../blocs/product/product_bloc.dart';
 import '../../../blocs/product/product_state.dart';
+import 'pos_item_tile.dart';
 
-/// Items list widget for POS screen (similar to categories view)
+/// Items grid widget for POS screen
 class POSItemsGrid extends StatelessWidget {
+  final String? selectedCategoryId;
   final String? selectedSubCategoryId;
+  final String searchQuery;
   final Function(Item) onItemTap;
 
   const POSItemsGrid({
     super.key,
-    required this.selectedSubCategoryId,
+    this.selectedCategoryId,
+    this.selectedSubCategoryId,
+    this.searchQuery = '',
     required this.onItemTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return BlocBuilder<ProductBloc, ProductState>(
       builder: (context, productState) {
-        List<Item> items;
-        
-        if (selectedSubCategoryId == null) {
-          items = productState.items;
-        } else {
-          items = productState.items
-              .where((item) => item.subCategoryId == selectedSubCategoryId)
-              .toList();
+        // Filter items based on category, subcategory and search query
+        List<Item> items = productState.items;
+
+        if (selectedSubCategoryId != null) {
+          items = items.where((item) => item.subCategoryId == selectedSubCategoryId).toList();
+        } else if (selectedCategoryId != null) {
+          // Filter by all subcategories in this category
+          final subCatIds = productState.subCategories
+              .where((sub) => sub.categoryId == selectedCategoryId)
+              .map((sub) => sub.id)
+              .toSet();
+          items = items.where((item) => subCatIds.contains(item.subCategoryId)).toList();
+        }
+
+        if (searchQuery.isNotEmpty) {
+          final query = searchQuery.toLowerCase();
+          items = items.where((item) =>
+            item.name.toLowerCase().contains(query) ||
+            (item.barcode?.toLowerCase().contains(query) ?? false)
+          ).toList();
         }
 
         if (items.isEmpty) {
-          return Container(
-            width: 200,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border(
-                right: BorderSide(color: AppColors.border),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                l10n.noItemsFound,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.search_off,
+                  size: 64,
+                  color: AppColors.textSecondary.withValues(alpha: 0.3),
                 ),
-              ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  l10n.noItemsFound,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           );
         }
 
-        return Container(
-          width: 200,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border(
-              right: BorderSide(color: AppColors.border),
-            ),
+        return GridView.builder(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 200,
+            mainAxisExtent: 120,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
           ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: const BoxDecoration(
-                  color: AppColors.accent,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.shopping_bag,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        l10n.items,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return InkWell(
-                      onTap: () => onItemTap(item),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs,
-                          vertical: AppSpacing.sm,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          border: Border(
-                            left: BorderSide(
-                              color: Colors.transparent,
-                              width: 3,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    item.name,
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    CurrencyFormatter.format(item.price),
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.add_circle_outline,
-                              color: AppColors.accent,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return POSItemTile(
+              item: item,
+              onTap: () => onItemTap(item),
+            );
+          },
         );
       },
     );
   }
 }
-

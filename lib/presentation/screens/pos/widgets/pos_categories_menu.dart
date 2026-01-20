@@ -7,7 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../blocs/product/product_bloc.dart';
 import '../../../blocs/product/product_state.dart';
 
-/// Categories menu widget for POS screen
+/// Categories menu widget for POS screen (Horizontal version)
 class POSCategoriesMenu extends StatelessWidget {
   final String? selectedCategoryId;
   final ValueChanged<String?> onCategorySelected;
@@ -21,134 +21,55 @@ class POSCategoriesMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return BlocBuilder<ProductBloc, ProductState>(
       builder: (context, productState) {
         final categories = productState.categories;
-        
+
         if (categories.isEmpty) {
-          return Container(
-            width: 175,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border(
-                right: BorderSide(color: AppColors.border),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                l10n.noCategories,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         return Container(
-          width: 175,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border(
-              right: BorderSide(color: AppColors.border),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.category,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        l10n.category,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final isSelected = selectedCategoryId == category.id;
-                    return InkWell(
-                      onTap: () => onCategorySelected(isSelected ? null : category.id),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs,
-                          vertical: AppSpacing.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withValues(alpha: 0.1)
-                              : Colors.transparent,
-                          border: Border(
-                            left: BorderSide(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : Colors.transparent,
-                              width: 3,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                category.name,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  fontSize: 12,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isSelected)
-                              const Icon(
-                                Icons.chevron_right,
-                                color: AppColors.primary,
-                                size: 16,
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
+          height: 50,
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length + 1, // +1 for "All"
+            itemBuilder: (context, index) {
+              final isAll = index == 0;
+              final category = isAll ? null : categories[index - 1];
+              final categoryId = category?.id;
+              final categoryName = isAll ? l10n.all : category!.name;
+              final isSelected = selectedCategoryId == categoryId;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.sm),
+                child: ChoiceChip(
+                  label: Text(categoryName),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    onCategorySelected(selected ? categoryId : null);
                   },
+                  selectedColor: AppColors.primary,
+                  labelStyle: AppTextStyles.bodyMedium.copyWith(
+                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  backgroundColor: AppColors.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: isSelected ? AppColors.primary : AppColors.border,
+                    ),
+                  ),
+                  showCheckmark: false,
                 ),
-              ),
-            ],
+              );
+            },
           ),
         );
       },
     );
   }
 }
-
