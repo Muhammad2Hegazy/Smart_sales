@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../l10n/app_localizations.dart';
-import '../core/theme/app_colors.dart';
+import '../../core/theme/app_colors.dart';
 import 'pos_screen.dart';
 import '../blocs/sales/sales_bloc.dart';
 import '../blocs/sales/sales_event.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../l10n/app_localizations.dart';
+import '../../../l10n/app_localizations.dart';
 import 'sales/sales_reports_tab.dart';
 import 'warehouses/warehouses_reports_tab.dart';
 import 'accounts/accounts_reports_tab.dart';
