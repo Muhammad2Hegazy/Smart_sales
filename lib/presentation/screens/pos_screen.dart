@@ -18,7 +18,6 @@ import '../blocs/product/product_event.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/utils/tax_settings_helper.dart';
 import '../../core/database/database_helper.dart';
-import '../../domain/repositories/product_repository.dart';
 import 'pos/widgets/pos_table_menu.dart';
 import 'pos/widgets/pos_selected_tables.dart';
 import 'pos/widgets/pos_categories_menu.dart';

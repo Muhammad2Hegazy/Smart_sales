@@ -169,7 +169,7 @@ extension DatabaseHelperReports on DatabaseHelper {
       final dateStr = '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
       return 'PUR-$dateStr-${nextNumber.toString().padLeft(4, '0')}';
     } catch (e) {
-      debugPrint('Error getting next purchase invoice number: $e');
+      print('Error getting next purchase invoice number: $e');
       final now = DateTime.now();
       final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
       return 'PUR-$dateStr-0001';

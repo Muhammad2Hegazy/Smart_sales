@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../bloc/product/product_bloc.dart';
-import '../../../bloc/product/product_state.dart';
+import '../../../blocs/product/product_bloc.dart';
+import '../../../blocs/product/product_state.dart';
 
 class ItemSelectionDialog extends StatelessWidget {
   final AppLocalizations l10n;
