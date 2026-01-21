@@ -4,7 +4,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../l10n/app_localizations.dart';
 
-class POSSearchField extends StatelessWidget {
+class POSSearchField extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final TextEditingController? controller;
 
@@ -13,6 +13,40 @@ class POSSearchField extends StatelessWidget {
     required this.onChanged,
     this.controller,
   });
+
+  @override
+  State<POSSearchField> createState() => _POSSearchFieldState();
+}
+
+class _POSSearchFieldState extends State<POSSearchField> {
+  late final TextEditingController _controller;
+  late final bool _isInternalController;
+  bool _showClearButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isInternalController = widget.controller == null;
+    _controller = widget.controller ?? TextEditingController();
+    _controller.addListener(_updateClearButtonVisibility);
+    _showClearButton = _controller.text.isNotEmpty;
+  }
+
+  void _updateClearButtonVisibility() {
+    final show = _controller.text.isNotEmpty;
+    if (show != _showClearButton) {
+      setState(() => _showClearButton = show);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_updateClearButtonVisibility);
+    if (_isInternalController) {
+      _controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,12 +67,22 @@ class POSSearchField extends StatelessWidget {
         ],
       ),
       child: TextField(
-        controller: controller,
-        onChanged: onChanged,
+        controller: _controller,
+        onChanged: widget.onChanged,
         decoration: InputDecoration(
           hintText: l10n.searchProducts,
           hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textTertiary),
           prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+          suffixIcon: _showClearButton
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 20),
+                  tooltip: l10n.reset,
+                  onPressed: () {
+                    _controller.clear();
+                    widget.onChanged('');
+                  },
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
