@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/reports_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../widgets/report_dialog.dart';
@@ -50,8 +48,8 @@ class AccountBalancesReport {
         Expanded(
           child: DataTable2(
             columns: [
-              DataColumn2(label: Text(l10n.account ?? 'الحساب'), size: ColumnSize.L),
-              DataColumn2(label: Text(l10n.balance ?? 'الرصيد'), size: ColumnSize.M, textAlign: TextAlign.right),
+              DataColumn2(label: Text(l10n.account), size: ColumnSize.L),
+              DataColumn2(label: Text(l10n.balance), size: ColumnSize.M, numeric: true),
             ],
             rows: [
               DataRow(cells: [

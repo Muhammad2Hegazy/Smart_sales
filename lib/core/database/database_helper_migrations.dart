@@ -52,7 +52,10 @@ Future<void> _onCreate(Database db, int version) async {
   await db.execute('''
     CREATE TABLE categories (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL
+      name TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      updated_at TEXT
     )
   ''');
 
@@ -62,6 +65,9 @@ Future<void> _onCreate(Database db, int version) async {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       category_id TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      updated_at TEXT,
       FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
     )
   ''');
@@ -79,6 +85,9 @@ Future<void> _onCreate(Database db, int version) async {
       stock_unit TEXT,
       conversion_rate REAL NOT NULL DEFAULT 1.0,
       is_pos_only INTEGER NOT NULL DEFAULT 0,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      updated_at TEXT,
       FOREIGN KEY (sub_category_id) REFERENCES sub_categories (id) ON DELETE CASCADE
     )
   ''');
@@ -701,6 +710,12 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     ''');
 
     await db.execute('CREATE INDEX IF NOT EXISTS idx_purchases_supplier_id ON purchases(supplier_id)');
+  }
+  if (oldVersion < 33) {
+    // Add sync columns to categories, sub_categories, and items tables
+    await _addSyncColumnsToTable(db, 'categories');
+    await _addSyncColumnsToTable(db, 'sub_categories');
+    await _addSyncColumnsToTable(db, 'items');
   }
 }
 

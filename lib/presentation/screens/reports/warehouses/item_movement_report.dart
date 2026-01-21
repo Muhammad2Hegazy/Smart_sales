@@ -99,16 +99,16 @@ class ItemMovementReport {
                   size: ColumnSize.L,
                 ),
                 DataColumn2(
-                  label: Text(l10n.type ?? 'النوع', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.transactionType, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
                 ),
                 DataColumn2(
                   label: Text(l10n.quantity, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.S,
-                  textAlign: TextAlign.center,
+                  numeric: true,
                 ),
                 DataColumn2(
-                  label: Text(l10n.notes ?? 'ملاحظات', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.notes, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.L,
                 ),
               ],
@@ -212,7 +212,7 @@ class _ItemMovementInputDialogState extends State<_ItemMovementInputDialog> {
                     'startDate': _startDate,
                     'endDate': _endDate,
                   }),
-          child: Text(widget.l10n.ok ?? 'موافق'),
+          child: Text(widget.l10n.ok),
         ),
       ],
     );

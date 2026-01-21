@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/reports_service.dart';
 import '../../../../core/models/item.dart';
 import '../widgets/report_dialog.dart';
@@ -68,12 +66,11 @@ class InventoryCountReport {
                 DataColumn2(
                   label: Text(l10n.quantity, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
-                  textAlign: TextAlign.center,
+                  numeric: true,
                 ),
                 DataColumn2(
-                  label: Text(l10n.unit ?? 'الوحدة', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.unit, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.S,
-                  textAlign: TextAlign.center,
                 ),
               ],
               rows: reportData.map((data) {

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/reports_service.dart';
 import '../../../../core/models/supplier.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -51,8 +49,8 @@ class SupplierBalancesReport {
         Expanded(
           child: DataTable2(
             columns: [
-              DataColumn2(label: Text(l10n.supplier ?? 'المورد'), size: ColumnSize.L),
-              DataColumn2(label: Text(l10n.balance ?? 'الرصيد'), size: ColumnSize.M, textAlign: TextAlign.right),
+              DataColumn2(label: const Text('Supplier'), size: ColumnSize.L),
+              DataColumn2(label: Text(l10n.balance), size: ColumnSize.M, numeric: true),
             ],
             rows: suppliers.map((s) {
               return DataRow(cells: [

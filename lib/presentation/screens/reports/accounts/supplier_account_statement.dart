@@ -74,7 +74,7 @@ class SupplierAccountStatement {
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Text(
-            '${l10n.supplier ?? 'المورد'}: ${supplier.name}',
+            '${l10n.supplierAccountStatement}: ${supplier.name}',
             style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
@@ -91,10 +91,10 @@ class SupplierAccountStatement {
               headingRowColor: WidgetStateProperty.all(AppColors.background),
               columns: [
                 DataColumn2(label: Text(l10n.date), size: ColumnSize.M),
-                DataColumn2(label: Text(l10n.invoiceNumber ?? 'رقم الفاتورة'), size: ColumnSize.M),
-                DataColumn2(label: Text(l10n.total ?? 'الإجمالي'), size: ColumnSize.S, textAlign: TextAlign.right),
-                DataColumn2(label: Text(l10n.paidAmount ?? 'المدفوع'), size: ColumnSize.S, textAlign: TextAlign.right),
-                DataColumn2(label: Text(l10n.balance ?? 'الرصيد'), size: ColumnSize.S, textAlign: TextAlign.right),
+                DataColumn2(label: Text(l10n.invoiceNumber), size: ColumnSize.M),
+                DataColumn2(label: Text(l10n.total), size: ColumnSize.S, numeric: true),
+                DataColumn2(label: const Text('Paid'), size: ColumnSize.S, numeric: true),
+                DataColumn2(label: Text(l10n.balance), size: ColumnSize.S, numeric: true),
               ],
               rows: statement.map((data) {
                 return DataRow(cells: [
@@ -138,7 +138,7 @@ class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
           DropdownButtonFormField<Supplier>(
             value: _selectedSupplier,
             isExpanded: true,
-            decoration: InputDecoration(labelText: widget.l10n.supplier ?? 'المورد'),
+            decoration: const InputDecoration(labelText: 'Supplier'),
             items: widget.suppliers.map((s) {
               return DropdownMenuItem(value: s, child: Text(s.name));
             }).toList(),
@@ -192,7 +192,7 @@ class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
                     'startDate': _startDate,
                     'endDate': _endDate,
                   }),
-          child: Text(widget.l10n.ok ?? 'موافق'),
+          child: Text(widget.l10n.ok),
         ),
       ],
     );

@@ -180,7 +180,7 @@ class _DateRangeDialogState extends State<_DateRangeDialog> {
             'startDate': _startDate,
             'endDate': _endDate,
           }),
-          child: Text(widget.l10n.ok ?? 'موافق'),
+          child: Text(widget.l10n.ok),
         ),
       ],
     );

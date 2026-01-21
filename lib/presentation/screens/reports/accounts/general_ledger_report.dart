@@ -3,8 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/reports_service.dart';
 import '../../../../core/models/financial_transaction.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -55,9 +53,9 @@ class GeneralLedgerReport {
           child: DataTable2(
             columns: [
               DataColumn2(label: Text(l10n.date), size: ColumnSize.M),
-              DataColumn2(label: Text(l10n.type ?? 'النوع'), size: ColumnSize.S),
-              DataColumn2(label: Text(l10n.amount ?? 'المبلغ'), size: ColumnSize.S, textAlign: TextAlign.right),
-              DataColumn2(label: Text(l10n.notes ?? 'ملاحظات'), size: ColumnSize.L),
+              DataColumn2(label: Text(l10n.transactionType), size: ColumnSize.S),
+              DataColumn2(label: Text(l10n.amount), size: ColumnSize.S, numeric: true),
+              DataColumn2(label: Text(l10n.notes), size: ColumnSize.L),
             ],
             rows: transactions.map((t) {
               return DataRow(cells: [
@@ -67,7 +65,7 @@ class GeneralLedgerReport {
                   alignment: Alignment.centerRight,
                   child: Text(CurrencyFormatter.format(t.amount)),
                 )),
-                DataCell(Text(t.notes ?? '')),
+                DataCell(Text(t.description)),
               ]);
             }).toList(),
           ),

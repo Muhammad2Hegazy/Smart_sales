@@ -101,12 +101,12 @@ class ItemByMovementReport {
                 DataColumn2(
                   label: Text(l10n.quantity, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
-                  textAlign: TextAlign.center,
+                  numeric: true,
                 ),
                 DataColumn2(
-                  label: Text(l10n.totalValue ?? 'إجمالي القيمة', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(l10n.totalValue, style: const TextStyle(fontWeight: FontWeight.bold)),
                   size: ColumnSize.M,
-                  textAlign: TextAlign.right,
+                  numeric: true,
                 ),
               ],
               rows: trend.map((data) {
@@ -211,7 +211,7 @@ class _ItemTrendInputDialogState extends State<_ItemTrendInputDialog> {
                     'startDate': _startDate,
                     'endDate': _endDate,
                   }),
-          child: Text(widget.l10n.ok ?? 'موافق'),
+          child: Text(widget.l10n.ok),
         ),
       ],
     );
