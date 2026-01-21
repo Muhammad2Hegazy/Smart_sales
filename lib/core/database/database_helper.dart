@@ -86,7 +86,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       dbPath,
-      version: 33,
+      version: 34,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );

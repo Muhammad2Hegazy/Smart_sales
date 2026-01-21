@@ -580,6 +580,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSyncTab(BuildContext context, AppLocalizations l10n) {
+    final apiUrlController = TextEditingController();
+
+    // Load current API URL
+    SharedPreferences.getInstance().then((prefs) {
+      apiUrlController.text = prefs.getString('sync_api_url') ?? '';
+    });
+
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
@@ -609,7 +616,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               } catch (e) {
                 return ListTile(
                   title: Text(l10n.syncServiceNotAvailable),
-                  subtitle: Text(l10n.syncRequiresSupabase),
+                  subtitle: Text(l10n.syncStatus),
                   leading: const Icon(
                     Icons.info_outline,
                     color: AppColors.primary,
@@ -617,6 +624,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               }
             },
+          ),
+        ]),
+        const SizedBox(height: AppSpacing.lg),
+        _buildSectionHeader('Sync Configuration'),
+        _buildSettingsCard([
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Online Database API URL',
+                  style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: apiUrlController,
+                  decoration: const InputDecoration(
+                    hintText: 'https://your-api-server.com/api',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.link),
+                  ),
+                  onChanged: (value) async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('sync_api_url', value.trim());
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'This URL will be used to synchronize your local database with the online database.',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
         ]),
       ],
@@ -2706,7 +2747,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ),
                                     DropdownMenuItem<int?>(
                                       value: 2,
-                                      child: Text(l10n.secondFloor),
+                                      child: Text('${l10n.secondFloor} (Master Device)'),
                                     ),
                                     DropdownMenuItem<int?>(
                                       value: 3,

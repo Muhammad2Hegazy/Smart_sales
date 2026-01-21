@@ -278,6 +278,7 @@ Future<void> _onCreate(Database db, int version) async {
   await db.execute('''
     CREATE TABLE IF NOT EXISTS shift_reports (
       id TEXT PRIMARY KEY,
+      shift_id TEXT,
       shift_start TEXT NOT NULL,
       shift_end TEXT NOT NULL,
       user_id TEXT NOT NULL,
@@ -286,7 +287,11 @@ Future<void> _onCreate(Database db, int version) async {
       total_card REAL NOT NULL,
       total_expenses REAL NOT NULL,
       floor_id INTEGER,
+      device_id TEXT,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      updated_at TEXT,
       FOREIGN KEY (user_id) REFERENCES user_profiles (user_id) ON DELETE CASCADE
     )
   ''');
@@ -299,6 +304,9 @@ Future<void> _onCreate(Database db, int version) async {
       quantity REAL NOT NULL,
       reason TEXT,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      updated_at TEXT,
       FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
     )
   ''');
@@ -716,6 +724,37 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     await _addSyncColumnsToTable(db, 'categories');
     await _addSyncColumnsToTable(db, 'sub_categories');
     await _addSyncColumnsToTable(db, 'items');
+  }
+  if (oldVersion < 34) {
+    // Add sync columns to shift_reports and inventory_movements
+    await _addSyncColumnsToTable(db, 'shift_reports');
+    await _addSyncColumnsToTable(db, 'inventory_movements');
+
+    // Add sync columns to raw materials related tables
+    await _addSyncColumnsToTable(db, 'raw_materials');
+    await _addSyncColumnsToTable(db, 'raw_material_categories');
+    await _addSyncColumnsToTable(db, 'raw_material_sub_categories');
+    await _addSyncColumnsToTable(db, 'raw_material_batches');
+    await _addSyncColumnsToTable(db, 'raw_material_units');
+    await _addSyncColumnsToTable(db, 'recipes');
+    await _addSyncColumnsToTable(db, 'recipe_ingredients');
+    await _addSyncColumnsToTable(db, 'suppliers');
+    await _addSyncColumnsToTable(db, 'purchases');
+    await _addSyncColumnsToTable(db, 'purchase_items');
+
+    // Also add shift_id and device_id to shift_reports if they don't exist
+    try {
+      final result = await db.rawQuery("PRAGMA table_info(shift_reports)");
+      final columns = result.map((row) => row['name'] as String).toSet();
+      if (!columns.contains('shift_id')) {
+        await db.execute('ALTER TABLE shift_reports ADD COLUMN shift_id TEXT');
+      }
+      if (!columns.contains('device_id')) {
+        await db.execute('ALTER TABLE shift_reports ADD COLUMN device_id TEXT');
+      }
+    } catch (e) {
+      debugPrint('Error upgrading shift_reports: $e');
+    }
   }
 }
 

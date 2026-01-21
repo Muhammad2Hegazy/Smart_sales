@@ -20,9 +20,12 @@ import 'presentation/blocs/auth/auth_event.dart';
 import 'presentation/blocs/auth/auth_state.dart';
 import 'presentation/blocs/device/device_bloc.dart';
 import 'presentation/blocs/device/device_event.dart';
+import 'presentation/blocs/sync/sync_bloc.dart';
+import 'presentation/blocs/sync/sync_event.dart';
 import 'presentation/blocs/user_management/user_management_bloc.dart';
 import 'core/database/database_helper.dart';
 import 'core/services/product_service.dart';
+import 'core/services/sync_service.dart';
 import 'core/data_sources/local/master_local_data_source.dart';
 import 'core/data_sources/local/device_local_data_source.dart';
 import 'core/data_sources/local/auth_local_data_source.dart';
@@ -208,6 +211,9 @@ class SmartSalesAppState extends State<SmartSalesApp> {
         RepositoryProvider<IAuthRepository>.value(value: authRepository),
         RepositoryProvider<IProductRepository>.value(value: productRepository),
         RepositoryProvider<DatabaseHelper>.value(value: dbHelper),
+        RepositoryProvider<SyncService>(
+          create: (context) => SyncService(context.read<DatabaseHelper>()),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -245,6 +251,9 @@ class SmartSalesAppState extends State<SmartSalesApp> {
 
               return UserManagementBloc(userManagementRepository);
             },
+          ),
+          BlocProvider(
+            create: (context) => SyncBloc(context.read<SyncService>())..add(const StartSyncListener()),
           ),
         ],
         child: MaterialApp(
