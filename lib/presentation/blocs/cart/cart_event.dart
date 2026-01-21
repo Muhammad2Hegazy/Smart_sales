@@ -40,6 +40,15 @@ class ClearCart extends CartEvent {
   const ClearCart();
 }
 
+class SetCartItems extends CartEvent {
+  final List<CartItem> items;
+
+  const SetCartItems(this.items);
+
+  @override
+  List<Object?> get props => [items];
+}
+
 class SetOrderNumber extends CartEvent {
   final int orderNumber;
 

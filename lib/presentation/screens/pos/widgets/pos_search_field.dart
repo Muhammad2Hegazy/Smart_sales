@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -22,6 +23,7 @@ class _POSSearchFieldState extends State<POSSearchField> {
   late final TextEditingController _controller;
   late final bool _isInternalController;
   bool _showClearButton = false;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -41,6 +43,7 @@ class _POSSearchFieldState extends State<POSSearchField> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.removeListener(_updateClearButtonVisibility);
     if (_isInternalController) {
       _controller.dispose();
@@ -68,7 +71,12 @@ class _POSSearchFieldState extends State<POSSearchField> {
       ),
       child: TextField(
         controller: _controller,
-        onChanged: widget.onChanged,
+        onChanged: (value) {
+          if (_debounce?.isActive ?? false) _debounce?.cancel();
+          _debounce = Timer(const Duration(milliseconds: 300), () {
+            widget.onChanged(value);
+          });
+        },
         decoration: InputDecoration(
           hintText: l10n.searchProducts,
           hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textTertiary),
@@ -79,6 +87,7 @@ class _POSSearchFieldState extends State<POSSearchField> {
                   tooltip: l10n.reset,
                   onPressed: () {
                     _controller.clear();
+                    if (_debounce?.isActive ?? false) _debounce?.cancel();
                     widget.onChanged('');
                   },
                 )
