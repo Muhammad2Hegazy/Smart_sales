@@ -1681,4 +1681,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get deleteIngredient => 'حذف المكون';
+
+  @override
+  String get minimize => 'تصغير';
+
+  @override
+  String get exitFullScreen => 'تبديل ملء الشاشة';
+
+  @override
+  String get exitApp => 'إغلاق التطبيق';
+
+  @override
+  String get exitAppConfirm => 'هل أنت متأكد من إغلاق التطبيق؟';
+
+  @override
+  String get exit => 'خروج';
 }

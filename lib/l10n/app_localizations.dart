@@ -3394,6 +3394,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete Ingredient'**
   String get deleteIngredient;
+
+  /// No description provided for @minimize.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize'**
+  String get minimize;
+
+  /// No description provided for @exitFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Full Screen'**
+  String get exitFullScreen;
+
+  /// No description provided for @exitApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Application'**
+  String get exitApp;
+
+  /// No description provided for @exitAppConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to close the application?'**
+  String get exitAppConfirm;
+
+  /// No description provided for @exit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get exit;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

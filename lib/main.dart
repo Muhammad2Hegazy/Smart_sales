@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:window_manager/window_manager.dart';
 import 'dart:async';
+import 'dart:io';
 import 'core/constants/app_constants.dart';
+import 'core/widgets/window_controls.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/main_screen.dart';
@@ -32,6 +36,29 @@ import 'data/repositories/product_repository_impl.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set forced full screen
+  try {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      await windowManager.ensureInitialized();
+      WindowOptions windowOptions = const WindowOptions(
+        center: true,
+        backgroundColor: Colors.transparent,
+        skipTaskbar: false,
+        titleBarStyle: TitleBarStyle.normal,
+        fullScreen: true,
+      );
+      windowManager.waitUntilReadyToShow(windowOptions, () async {
+        await windowManager.show();
+        await windowManager.focus();
+        await windowManager.setFullScreen(true);
+      });
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  } catch (e) {
+    debugPrint('Error setting full screen: $e');
+  }
 
   // Clear login state on app startup - users must log in each time
   try {
@@ -227,16 +254,17 @@ class SmartSalesAppState extends State<SmartSalesApp> {
           locale: _locale,
           localizationsDelegates: AppTheme.localizationsDelegates,
           supportedLocales: AppTheme.supportedLocales,
-          home: BlocListener<AuthBloc, AuthState>(
-            listener: (context, authState) {
-              // Only dispatch InitializeMaster once when authenticated
-              if (authState is AuthAuthenticated) {
-                context.read<DeviceBloc>().add(
-                  InitializeMaster(userId: authState.user.id),
-                );
-              }
-            },
-            child: BlocBuilder<AuthBloc, AuthState>(
+          home: WindowControlsOverlay(
+            child: BlocListener<AuthBloc, AuthState>(
+              listener: (context, authState) {
+                // Only dispatch InitializeMaster once when authenticated
+                if (authState is AuthAuthenticated) {
+                  context.read<DeviceBloc>().add(
+                    InitializeMaster(userId: authState.user.id),
+                  );
+                }
+              },
+              child: BlocBuilder<AuthBloc, AuthState>(
               builder: (context, authState) {
                 if (authState is AuthAuthenticated) {
                   return const MainScreen();
@@ -260,13 +288,14 @@ class SmartSalesAppState extends State<SmartSalesApp> {
                     ),
                   );
                 }
-                // Show loading screen while checking auth status (AuthLoading)
-                return const Scaffold(
-                  body: Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              },
+                  // Show loading screen while checking auth status (AuthLoading)
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),

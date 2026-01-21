@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../l10n/app_localizations.dart';
@@ -310,8 +309,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        if (Navigator.canPop(context))
+        if (Navigator.canPop(context)) {
           Navigator.pop(context); // Remove loading if active
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),

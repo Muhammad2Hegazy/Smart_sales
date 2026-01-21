@@ -10,6 +10,7 @@ import 'printer_settings_helper.dart';
 
 class InvoicePrinter {
   static pw.Font? _arabicFont;
+  static pw.Font? _arabicBoldFont;
   
   static Future<pw.Font> _getArabicFont() async {
     if (_arabicFont != null) return _arabicFont!;
@@ -18,14 +19,39 @@ class InvoicePrinter {
       // Load Arabic font from assets
       final fontData = await rootBundle.load('fonts/NotoSansArabic-Regular.ttf');
       _arabicFont = pw.Font.ttf(fontData);
+      debugPrint('Arabic font loaded successfully');
       return _arabicFont!;
     } catch (e) {
-      // If font loading fails, try to use a font that might support Arabic
-      // Note: This is a fallback and may not render Arabic correctly
+      // If font loading fails, try alternative paths
       debugPrint('Warning: Could not load Arabic font from assets: $e');
-      debugPrint('Arabic text may not display correctly. Please ensure fonts/NotoSansArabic-Regular.ttf exists.');
-      _arabicFont = pw.Font.helvetica();
-      return _arabicFont!;
+      try {
+        // Try with assets prefix
+        final fontData = await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf');
+        _arabicFont = pw.Font.ttf(fontData);
+        debugPrint('Arabic font loaded from assets/fonts/');
+        return _arabicFont!;
+      } catch (e2) {
+        debugPrint('Warning: Could not load Arabic font from assets/fonts: $e2');
+        debugPrint('Arabic text may not display correctly. Please ensure fonts/NotoSansArabic-Regular.ttf exists.');
+        // Use a built-in font as fallback - won't support Arabic properly
+        _arabicFont = pw.Font.helvetica();
+        return _arabicFont!;
+      }
+    }
+  }
+  
+  static Future<pw.Font> _getArabicBoldFont() async {
+    if (_arabicBoldFont != null) return _arabicBoldFont!;
+    
+    try {
+      // Try to load bold variant if it exists
+      final fontData = await rootBundle.load('fonts/NotoSansArabic-Bold.ttf');
+      _arabicBoldFont = pw.Font.ttf(fontData);
+      return _arabicBoldFont!;
+    } catch (e) {
+      // Fall back to regular font
+      _arabicBoldFont = await _getArabicFont();
+      return _arabicBoldFont!;
     }
   }
   

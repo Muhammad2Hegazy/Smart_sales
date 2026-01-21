@@ -1173,5 +1173,15 @@
   "editIngredient": "Edit Ingredient",
   "@editIngredient": {},
   "deleteIngredient": "Delete Ingredient",
-  "@deleteIngredient": {}
+  "@deleteIngredient": {},
+  "minimize": "Minimize",
+  "@minimize": {},
+  "exitFullScreen": "Toggle Full Screen",
+  "@exitFullScreen": {},
+  "exitApp": "Exit Application",
+  "@exitApp": {},
+  "exitAppConfirm": "Are you sure you want to close the application?",
+  "@exitAppConfirm": {},
+  "exit": "Exit",
+  "@exit": {}
 }

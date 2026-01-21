@@ -76,6 +76,7 @@ dependencies:
   network_info_plus: ^6.0.0
   data_table_2: ^2.7.2
   csv: ^6.0.0
+  window_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:

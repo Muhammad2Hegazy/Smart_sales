@@ -413,71 +413,80 @@ class _POSContentState extends State<_POSContent> {
                   });
               },
             ),
-            // Categories Menu (only if at least one table is selected)
-            if (_selectedTableNumbers.isNotEmpty)
-              POSCategoriesMenu(
-                selectedCategoryId: _selectedCategoryId,
-                onCategorySelected: (value) {
-                  setState(() {
-                    _selectedCategoryId = value;
-                    _selectedSubCategoryId = null;
-                  });
-                },
-              )
-            else
-              // Placeholder when no table is selected
-              Container(
-                width: 200,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  border: Border(
-                    right: BorderSide(color: AppColors.border),
-                  ),
+            // Categories and SubCategories Sidebar
+            Container(
+              width: 220,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  right: BorderSide(color: AppColors.border),
                 ),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+              ),
+              child: _selectedTableNumbers.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.table_restaurant_outlined,
+                              size: 64,
+                              color: AppColors.textSecondary.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              l10n.selectTable,
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.bodyLarge.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Please select a table to start an order',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Column(
                       children: [
-                        Icon(
-                          Icons.table_restaurant_outlined,
-                          size: 64,
-                          color: AppColors.textSecondary.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          l10n.selectTable,
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          flex: 3,
+                          child: POSCategoriesMenu(
+                            selectedCategoryId: _selectedCategoryId,
+                            onCategorySelected: (value) {
+                              setState(() {
+                                _selectedCategoryId = value;
+                                _selectedSubCategoryId = null;
+                              });
+                            },
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Please select a table to start an order',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary.withValues(alpha: 0.7),
+                        if (_selectedCategoryId != null) ...[
+                          const Divider(height: 1, thickness: 1),
+                          Expanded(
+                            flex: 2,
+                            child: POSSubCategoriesMenu(
+                              selectedCategoryId: _selectedCategoryId,
+                              selectedSubCategoryId: _selectedSubCategoryId,
+                              onSubCategorySelected: (value) {
+                                setState(() {
+                                  _selectedSubCategoryId = value;
+                                });
+                              },
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
-                  ),
-                ),
-              ),
-            // SubCategories Menu (if category selected and table is selected)
-            if (_selectedTableNumbers.isNotEmpty && _selectedCategoryId != null)
-              POSSubCategoriesMenu(
-                selectedCategoryId: _selectedCategoryId,
-                selectedSubCategoryId: _selectedSubCategoryId,
-                onSubCategorySelected: (value) {
-                  setState(() {
-                    _selectedSubCategoryId = value;
-                  });
-                },
-              ),
+            ),
             // Items Grid (if subcategory selected and table is selected)
             if (_selectedTableNumbers.isNotEmpty && _selectedSubCategoryId != null)
               Expanded(

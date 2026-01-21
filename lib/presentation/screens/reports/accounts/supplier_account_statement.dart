@@ -22,7 +22,8 @@ class SupplierAccountStatement {
       builder: (context) => _SupplierSelectionDialog(l10n: l10n, suppliers: suppliers),
     );
 
-    if (result != null && context.mounted) {
+    if (result != null) {
+      if (!context.mounted) return;
       final selectedSupplier = result['supplier'] as Supplier;
       final startDate = result['startDate'] as DateTime;
       final endDate = result['endDate'] as DateTime;

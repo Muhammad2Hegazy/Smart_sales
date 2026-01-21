@@ -28,12 +28,9 @@ class POSCategoriesMenu extends StatelessWidget {
         
         if (categories.isEmpty) {
           return Container(
-            width: 175,
-            decoration: BoxDecoration(
+            width: double.infinity,
+            decoration: const BoxDecoration(
               color: AppColors.surface,
-              border: Border(
-                right: BorderSide(color: AppColors.border),
-              ),
             ),
             child: Center(
               child: Text(
@@ -49,12 +46,9 @@ class POSCategoriesMenu extends StatelessWidget {
         }
 
         return Container(
-          width: 175,
-          decoration: BoxDecoration(
+          width: double.infinity,
+          decoration: const BoxDecoration(
             color: AppColors.surface,
-            border: Border(
-              right: BorderSide(color: AppColors.border),
-            ),
           ),
           child: Column(
             children: [

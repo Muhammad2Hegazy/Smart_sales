@@ -1681,4 +1681,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteIngredient => 'Delete Ingredient';
+
+  @override
+  String get minimize => 'Minimize';
+
+  @override
+  String get exitFullScreen => 'Toggle Full Screen';
+
+  @override
+  String get exitApp => 'Exit Application';
+
+  @override
+  String get exitAppConfirm => 'Are you sure you want to close the application?';
+
+  @override
+  String get exit => 'Exit';
 }

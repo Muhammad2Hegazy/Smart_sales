@@ -358,7 +358,7 @@ Future<void> _onCreate(Database db, int version) async {
 }
 
 Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-  print('Upgrading database from $oldVersion to $newVersion');
+  debugPrint('Upgrading database from $oldVersion to $newVersion');
   if (oldVersion < 2) {
     // Add sales table if not exists
     await db.execute('''
@@ -599,7 +599,7 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
         await db.execute('ALTER TABLE items ADD COLUMN stock_unit TEXT');
       }
     } catch (e) {
-      print('Error adding stock_unit to items: $e');
+      debugPrint('Error adding stock_unit to items: $e');
     }
   }
   if (oldVersion < 27) {
@@ -621,7 +621,7 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
         await db.execute('ALTER TABLE items ADD COLUMN is_pos_only INTEGER NOT NULL DEFAULT 0');
       }
     } catch (e) {
-      print('Error adding columns to items: $e');
+      debugPrint('Error adding columns to items: $e');
     }
   }
   if (oldVersion < 29) {
@@ -725,7 +725,7 @@ Future<void> _addSyncColumnsToTable(Database db, String tableName) async {
     await db.execute("ALTER TABLE $tableName ADD COLUMN sync_status TEXT DEFAULT 'pending'");
     await db.execute('ALTER TABLE $tableName ADD COLUMN updated_at TEXT');
   } catch (e) {
-    print('Sync columns may already exist in $tableName: $e');
+    debugPrint('Sync columns may already exist in $tableName: $e');
   }
 }
 
@@ -757,7 +757,7 @@ Future<void> _updateRoleConstraint(Database db) async {
     // Drop old table
     await db.execute('DROP TABLE user_profiles_old');
   } catch (e) {
-    print('Error updating role constraint: $e');
+    debugPrint('Error updating role constraint: $e');
   }
 }
 
@@ -769,7 +769,7 @@ Future<void> _addSalesTableColumns(Database db) async {
       await db.execute('ALTER TABLE sales ADD COLUMN device_id TEXT');
     }
   } catch (e) {
-    print('Error adding device_id to sales: $e');
+    debugPrint('Error adding device_id to sales: $e');
   }
 }
 
@@ -779,14 +779,14 @@ Future<void> _ensureSalesTableColumns(Database db) async {
     final columns = result.map((row) => row['name'] as String).toSet();
     if (!columns.contains('device_id')) {
       await db.execute('ALTER TABLE sales ADD COLUMN device_id TEXT');
-      print('  ✓ Added device_id column to sales table');
+      debugPrint('  ✓ Added device_id column to sales table');
     }
     if (!columns.contains('master_device_id')) {
       await db.execute('ALTER TABLE sales ADD COLUMN master_device_id TEXT');
-      print('  ✓ Added master_device_id column to sales table');
+      debugPrint('  ✓ Added master_device_id column to sales table');
     }
   } catch (e) {
-    print('Error ensuring sales table columns: $e');
+    debugPrint('Error ensuring sales table columns: $e');
   }
 }
 
@@ -818,10 +818,10 @@ Future<void> _createDefaultAdminUser(Database db) async {
         'updated_at': now,
       });
       
-      print('Default admin user created: admin / mohamed2003');
+      debugPrint('Default admin user created: admin / mohamed2003');
     }
   } catch (e) {
-    print('Error creating default admin user: $e');
+    debugPrint('Error creating default admin user: $e');
   }
 }
 
@@ -834,16 +834,16 @@ Future<void> _ensureStockColumnsExist(Database db) async {
     if (!hasStockQuantity) {
       await db.execute('ALTER TABLE items ADD COLUMN stock_quantity REAL');
       await db.execute('UPDATE items SET stock_quantity = 0.0 WHERE stock_quantity IS NULL');
-      print('Added stock_quantity column to items table');
+      debugPrint('Added stock_quantity column to items table');
     }
     
     if (!hasStockUnit) {
       await db.execute('ALTER TABLE items ADD COLUMN stock_unit TEXT');
       await db.execute('UPDATE items SET stock_unit = \'number\' WHERE stock_unit IS NULL');
-      print('Added stock_unit column to items table');
+      debugPrint('Added stock_unit column to items table');
     }
   } catch (e) {
-    print('Error ensuring stock columns exist: $e');
+    debugPrint('Error ensuring stock columns exist: $e');
     // Try to add columns anyway
     try {
       await db.execute('ALTER TABLE items ADD COLUMN stock_quantity REAL');
@@ -894,7 +894,7 @@ Future<void> _addRawMaterialCategories(Database db) async {
         await db.execute('CREATE INDEX IF NOT EXISTS idx_raw_materials_sub_category_id ON raw_materials(sub_category_id)');
       }
     } catch (e) {
-      print('Error adding sub_category_id to raw_materials: $e');
+      debugPrint('Error adding sub_category_id to raw_materials: $e');
     }
     
     // Update existing water material to use carton as base unit
@@ -918,7 +918,7 @@ Future<void> _addRawMaterialCategories(Database db) async {
     // Add all raw materials data
     await _populateRawMaterialsData(db);
   } catch (e) {
-    print('Error adding raw material categories: $e');
+    debugPrint('Error adding raw material categories: $e');
   }
 }
 
@@ -1045,34 +1045,34 @@ Future<void> _addPriceToBatches(Database db) async {
       await db.execute('ALTER TABLE raw_material_batches ADD COLUMN price REAL');
     }
   } catch (e) {
-    print('Error adding price column: $e');
+    debugPrint('Error adding price column: $e');
   }
 }
 
 Future<void> _updateWaterBaseUnit(Database db) async {
   try {
-    print('Updating water base unit...');
+    debugPrint('Updating water base unit...');
     await db.update('raw_materials', {
       'base_unit': 'carton',
       'unit': 'كرتونة',
       'updated_at': DateTime.now().toIso8601String(),
     }, where: 'name = ?', whereArgs: ['ماء']);
   } catch (e) {
-    print('Error updating water base unit: $e');
+    debugPrint('Error updating water base unit: $e');
   }
 }
 
 Future<void> _updateRawMaterialsBaseUnits(Database db) async {
   // Logic from version 29 - simplified for brevity
-  print('Updating raw materials base units (v29)...');
+  debugPrint('Updating raw materials base units (v29)...');
 }
 
 Future<void> _addSoftDrinksCategory(Database db) async {
-  print('Adding soft drinks category (v30)...');
+  debugPrint('Adding soft drinks category (v30)...');
 }
 
 Future<void> _addMilkSubCategory(Database db) async {
-  print('Adding milk subcategory (v31)...');
+  debugPrint('Adding milk subcategory (v31)...');
 }
 
 Future<void> _makeExpiryDateOptional(Database db) async {
@@ -1092,7 +1092,7 @@ Future<void> _makeExpiryDateOptional(Database db) async {
     await db.execute('DROP TABLE raw_material_batches');
     await db.execute('ALTER TABLE raw_material_batches_new RENAME TO raw_material_batches');
   } catch (e) {
-    print('Error making expiry_date optional: $e');
+    debugPrint('Error making expiry_date optional: $e');
   }
 }
 
@@ -1110,8 +1110,8 @@ Future<void> _addRestaurantInventorySystem(Database db) async {
         UNIQUE(raw_material_id, unit)
       )
     ''');
-    print('Restaurant Inventory System migration (v22) complete');
+    debugPrint('Restaurant Inventory System migration (v22) complete');
   } catch (e) {
-    print('Error adding restaurant inventory system: $e');
+    debugPrint('Error adding restaurant inventory system: $e');
   }
 }
