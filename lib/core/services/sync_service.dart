@@ -21,6 +21,16 @@ class SyncService {
     'financial_transactions',
     'shift_reports',
     'inventory_movements',
+    'raw_materials',
+    'raw_material_categories',
+    'raw_material_sub_categories',
+    'raw_material_batches',
+    'raw_material_units',
+    'recipes',
+    'recipe_ingredients',
+    'suppliers',
+    'purchases',
+    'purchase_items',
   ];
 
   SyncService(this._dbHelper);
@@ -65,6 +75,8 @@ class SyncService {
 
   Future<void> _syncTable(String tableName, String masterDeviceId) async {
     try {
+      final String primaryKey = _getPrimaryKeyColumn(tableName);
+
       // 1. Push pending
       final pending = await _dbHelper.getPendingSyncRecords(tableName, masterDeviceId);
       if (pending.isNotEmpty) {
@@ -75,7 +87,7 @@ class SyncService {
 
         if (response.statusCode == 200 || response.statusCode == 201) {
           for (var record in pending) {
-            final id = record['id'] ?? record['user_id'] ?? record['device_id'];
+            final id = record[primaryKey];
             if (id != null) {
               await _dbHelper.updateSyncStatus(tableName, id.toString(), 'synced');
             }
@@ -121,6 +133,21 @@ class SyncService {
   Future<void> _setLastSyncTime(String tableName, String time) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_sync_$tableName', time);
+  }
+
+  String _getPrimaryKeyColumn(String tableName) {
+    switch (tableName) {
+      case 'user_profiles':
+      case 'user_passwords':
+      case 'user_permissions':
+        return 'user_id';
+      case 'masters':
+        return 'master_device_id';
+      case 'devices':
+        return 'device_id';
+      default:
+        return 'id';
+    }
   }
 
   Future<void> markForSync(String tableName, String id) async {

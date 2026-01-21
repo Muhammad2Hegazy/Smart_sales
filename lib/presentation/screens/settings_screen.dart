@@ -67,12 +67,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _canImportData = true;
   bool _canConfigureTax = true;
   bool _canConfigurePrinter = true;
+  bool _isManualSyncTriggered = false;
+  final TextEditingController _apiUrlController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _initializePermissions();
     _loadSettings();
+    _loadSyncApiUrl();
     // Load users if admin
     context.read<UserManagementBloc>().add(const CheckAdminStatus());
     context.read<UserManagementBloc>().add(const LoadUsers());
@@ -139,6 +142,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  Future<void> _loadSyncApiUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    _apiUrlController.text = prefs.getString('sync_api_url') ?? '';
+  }
+
+  @override
+  void dispose() {
+    _apiUrlController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -147,24 +161,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return BlocListener<UserManagementBloc, UserManagementState>(
-      listener: (context, state) {
-        if (state is UserManagementSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.userCreatedSuccessfully),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        } else if (state is UserManagementError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<UserManagementBloc, UserManagementState>(
+          listener: (context, state) {
+            if (state is UserManagementSuccess) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(l10n.userCreatedSuccessfully),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            } else if (state is UserManagementError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+        ),
+        BlocListener<SyncBloc, SyncState>(
+          listener: (context, state) {
+            if (state is SyncReady) {
+              if (state.error != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.error!),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+                setState(() => _isManualSyncTriggered = false);
+              } else if (state.isSyncing == false && state.lastSyncTime != null) {
+                if (_isManualSyncTriggered) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Database synced successfully with online server'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                  setState(() => _isManualSyncTriggered = false);
+                }
+              }
+            }
+          },
+        ),
+      ],
       child: BlocBuilder<UserManagementBloc, UserManagementState>(
         builder: (context, userMgmtState) {
           final isAdmin =
@@ -580,13 +623,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSyncTab(BuildContext context, AppLocalizations l10n) {
-    final apiUrlController = TextEditingController();
-
-    // Load current API URL
-    SharedPreferences.getInstance().then((prefs) {
-      apiUrlController.text = prefs.getString('sync_api_url') ?? '';
-    });
-
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
@@ -640,7 +676,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
-                  controller: apiUrlController,
+                  controller: _apiUrlController,
                   decoration: const InputDecoration(
                     hintText: 'https://your-api-server.com/api',
                     border: OutlineInputBorder(),
@@ -1798,7 +1834,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : null,
       trailing: const Icon(Icons.chevron_right),
       onTap: syncState.isOnline && !syncState.isSyncing
-          ? () => context.read<SyncBloc>().add(const TriggerSync())
+          ? () {
+              setState(() => _isManualSyncTriggered = true);
+              context.read<SyncBloc>().add(const TriggerSync());
+            }
           : null,
     );
   }

@@ -140,7 +140,7 @@ class _SalesReportsTabState extends State<SalesReportsTab> with TickerProviderSt
                 Tab(text: l10n.all),
                 ..._availableFloors.map((floor) {
                   String floorName;
-                  if (floor == 1) {
+                  if (floor == 0) {
                     floorName = l10n.groundFloor;
                   } else if (floor == 2) {
                     floorName = l10n.secondFloor;
@@ -160,7 +160,7 @@ class _SalesReportsTabState extends State<SalesReportsTab> with TickerProviderSt
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.md),
             child: Text(
-              '${l10n.floor}: ${currentFloor == 1 ? l10n.groundFloor : currentFloor == 2 ? l10n.secondFloor : currentFloor == 3 ? l10n.thirdFloor : currentFloor}',
+              '${l10n.floor}: ${currentFloor == 0 ? l10n.groundFloor : currentFloor == 2 ? l10n.secondFloor : currentFloor == 3 ? l10n.thirdFloor : currentFloor}',
               style: AppTextStyles.titleMedium.copyWith(color: AppColors.primary),
             ),
           ),

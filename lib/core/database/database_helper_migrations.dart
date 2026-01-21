@@ -198,6 +198,8 @@ Future<void> _onCreate(Database db, int version) async {
       minimum_alert_quantity REAL NOT NULL DEFAULT 0,
       sub_category_id TEXT,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL
     )
   ''');
@@ -210,6 +212,8 @@ Future<void> _onCreate(Database db, int version) async {
       price REAL,
       expiry_date TEXT,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL,
       FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
     )
@@ -222,6 +226,8 @@ Future<void> _onCreate(Database db, int version) async {
       unit TEXT NOT NULL,
       conversion_factor_to_base REAL NOT NULL,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL,
       FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE,
       UNIQUE(raw_material_id, unit)
@@ -233,6 +239,8 @@ Future<void> _onCreate(Database db, int version) async {
       id TEXT PRIMARY KEY,
       item_id TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL,
       FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
     )
@@ -246,6 +254,8 @@ Future<void> _onCreate(Database db, int version) async {
       quantity REAL NOT NULL,
       quantity_required_in_base_unit REAL,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL,
       FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
       FOREIGN KEY (raw_material_id) REFERENCES raw_materials(id) ON DELETE CASCADE
@@ -320,6 +330,8 @@ Future<void> _onCreate(Database db, int version) async {
       email TEXT,
       address TEXT,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL
     )
   ''');
@@ -333,6 +345,8 @@ Future<void> _onCreate(Database db, int version) async {
       invoice_number TEXT,
       status TEXT NOT NULL, -- 'pending', 'completed', 'cancelled'
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL,
       FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE CASCADE
     )
@@ -348,6 +362,8 @@ Future<void> _onCreate(Database db, int version) async {
       total_price REAL NOT NULL,
       expiry_date TEXT,
       created_at TEXT NOT NULL,
+      master_device_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       updated_at TEXT NOT NULL,
       FOREIGN KEY (purchase_id) REFERENCES purchases (id) ON DELETE CASCADE,
       FOREIGN KEY (raw_material_id) REFERENCES raw_materials (id) ON DELETE CASCADE
@@ -907,6 +923,8 @@ Future<void> _addRawMaterialCategories(Database db) async {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         created_at TEXT NOT NULL,
+        master_device_id TEXT,
+        sync_status TEXT DEFAULT 'pending',
         updated_at TEXT NOT NULL
       )
     ''');
@@ -918,6 +936,8 @@ Future<void> _addRawMaterialCategories(Database db) async {
         name TEXT NOT NULL,
         category_id TEXT NOT NULL,
         created_at TEXT NOT NULL,
+        master_device_id TEXT,
+        sync_status TEXT DEFAULT 'pending',
         updated_at TEXT NOT NULL,
         FOREIGN KEY (category_id) REFERENCES raw_material_categories(id) ON DELETE CASCADE
       )
