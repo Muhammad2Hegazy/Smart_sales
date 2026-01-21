@@ -7,6 +7,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/models/cart_item.dart';
 import '../../core/models/item.dart';
 import '../../core/models/low_stock_warning.dart';
+import '../../core/models/user_permission.dart';
 import '../../core/utils/invoice_printer.dart';
 import '../blocs/cart/cart_bloc.dart';
 import '../blocs/cart/cart_event.dart';
@@ -16,8 +17,11 @@ import '../blocs/financial/financial_bloc.dart';
 import '../blocs/product/product_bloc.dart';
 import '../blocs/product/product_event.dart';
 import '../../core/services/payment_service.dart';
+import '../../core/services/permission_service.dart';
 import '../../core/utils/tax_settings_helper.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/repositories/user_management_repository.dart';
+import '../../core/data_sources/local/user_management_local_data_source.dart';
 import 'pos/widgets/pos_table_menu.dart';
 import 'pos/widgets/pos_selected_tables.dart';
 import 'pos/widgets/pos_categories_menu.dart';
@@ -48,18 +52,97 @@ class _POSContentState extends State<_POSContent> {
   String? _selectedSubCategoryId;
   List<String> _selectedTableNumbers = [];
   String? _activeTableNumber; // The currently active table for adding items
-  final Map<String, int> _tableOrderNumbers = {}; // Map of table number to order number
-  final Map<String, List<CartItem>> _tableCarts = {}; // Map of table number to cart items
-  final Map<String, double> _tableDiscounts = {}; // Map of table number to discount percentage
+  final Map<String, int> _tableOrderNumbers =
+      {}; // Map of table number to order number
+  final Map<String, List<CartItem>> _tableCarts =
+      {}; // Map of table number to cart items
+  final Map<String, double> _tableDiscounts =
+      {}; // Map of table number to discount percentage
   bool _allowPrinting = false;
+
+  // Permission state
+  late PermissionService _permissionService;
+  bool _canApplyDiscount = true;
+  bool _canProcessPayment = true;
+  bool _canPrintInvoice = true;
+  bool _canClearCart = true;
 
   @override
   void initState() {
     super.initState();
+    _initializePermissions();
+    _restoreTablesWithPendingInvoices();
     // Load product data on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductBloc>().add(const LoadProducts());
     });
+  }
+
+  /// Restore tables that have pending invoices (items in cart)
+  Future<void> _restoreTablesWithPendingInvoices() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final pendingInvoices = await dbHelper.getAllPendingInvoices();
+
+      if (!mounted) return;
+
+      final tablesToRestore = <String>[];
+
+      for (final invoice in pendingInvoices) {
+        final items = invoice['items'] as List;
+        if (items.isNotEmpty) {
+          final tableNumbers = invoice['table_numbers'] as List<String>;
+          for (final tableNumber in tableNumbers) {
+            if (!tablesToRestore.contains(tableNumber)) {
+              tablesToRestore.add(tableNumber);
+            }
+          }
+        }
+      }
+
+      if (tablesToRestore.isNotEmpty) {
+        setState(() {
+          _selectedTableNumbers = tablesToRestore;
+          if (tablesToRestore.isNotEmpty) {
+            _activeTableNumber = tablesToRestore.first;
+          }
+        });
+        await _loadPendingInvoicesForTables(tablesToRestore);
+      }
+    } catch (e) {
+      debugPrint('Error restoring tables with pending invoices: $e');
+    }
+  }
+
+  /// Initialize permission service and load permissions
+  Future<void> _initializePermissions() async {
+    final dbHelper = DatabaseHelper();
+    final userManagementLocalDataSource = UserManagementLocalDataSource();
+    final userManagementRepository = UserManagementRepository(
+      userManagementLocalDataSource,
+      dbHelper,
+    );
+    _permissionService = PermissionService(dbHelper, userManagementRepository);
+
+    try {
+      final results = await Future.wait([
+        _permissionService.hasPermission(PermissionKeys.posApplyDiscount),
+        _permissionService.hasPermission(PermissionKeys.posProcessPayment),
+        _permissionService.hasPermission(PermissionKeys.posPrintInvoice),
+        _permissionService.hasPermission(PermissionKeys.posClearCart),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _canApplyDiscount = results[0];
+          _canProcessPayment = results[1];
+          _canPrintInvoice = results[2];
+          _canClearCart = results[3];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading POS permissions: $e');
+    }
   }
 
   /// Load pending invoice for a specific table
@@ -67,24 +150,28 @@ class _POSContentState extends State<_POSContent> {
     try {
       // TODO: Move pending invoice logic to a Repository
       final dbHelper = DatabaseHelper();
-      final pendingInvoice = await dbHelper.getPendingInvoiceByTableNumbers([tableNumber]);
-      
+      final pendingInvoice = await dbHelper.getPendingInvoiceByTableNumbers([
+        tableNumber,
+      ]);
+
       if (!mounted) return;
-      
+
       if (pendingInvoice != null) {
         // Restore cart items for this table
         final items = (pendingInvoice['items'] as List)
-            .map((item) => CartItem(
-                  id: item['id'] as String,
-                  name: item['name'] as String,
-                  price: (item['price'] as num).toDouble(),
-                  quantity: item['quantity'] as int,
-                ))
+            .map(
+              (item) => CartItem(
+                id: item['id'] as String,
+                name: item['name'] as String,
+                price: (item['price'] as num).toDouble(),
+                quantity: item['quantity'] as int,
+              ),
+            )
             .toList();
-        
+
         setState(() {
           _tableCarts[tableNumber] = items;
-          
+
           // Restore order number for this table
           if (pendingInvoice['table_order_numbers'] != null) {
             final orderNumbersMap = Map<String, int>.from(
@@ -94,20 +181,26 @@ class _POSContentState extends State<_POSContent> {
               _tableOrderNumbers[tableNumber] = orderNumbersMap[tableNumber]!;
             }
           }
-          
+
           // Restore discount for this table
-          _tableDiscounts[tableNumber] = pendingInvoice['discount_percentage'] as double;
+          _tableDiscounts[tableNumber] =
+              pendingInvoice['discount_percentage'] as double;
         });
-        
-        debugPrint('Loaded pending invoice for table $tableNumber: ${items.length} items');
+
+        debugPrint(
+          'Loaded pending invoice for table $tableNumber: ${items.length} items',
+        );
       } else {
         // Initialize empty cart for new table (only if not already set or empty)
-        if (!_tableCarts.containsKey(tableNumber) || _tableCarts[tableNumber]!.isEmpty) {
+        if (!_tableCarts.containsKey(tableNumber) ||
+            _tableCarts[tableNumber]!.isEmpty) {
           setState(() {
             _tableCarts[tableNumber] = [];
             _tableDiscounts[tableNumber] = 0.0;
           });
-          debugPrint('No pending invoice found for table $tableNumber, initialized empty cart');
+          debugPrint(
+            'No pending invoice found for table $tableNumber, initialized empty cart',
+          );
         }
       }
     } catch (e) {
@@ -118,7 +211,7 @@ class _POSContentState extends State<_POSContent> {
       });
     }
   }
-  
+
   /// Load pending invoices for all selected tables
   Future<void> _loadPendingInvoicesForTables(List<String> tableNumbers) async {
     for (final tableNumber in tableNumbers) {
@@ -126,17 +219,17 @@ class _POSContentState extends State<_POSContent> {
     }
     _updateDisplayCart();
   }
-  
+
   /// Update the display cart to show items from the active table only
   void _updateDisplayCart() {
     if (_activeTableNumber == null) {
       context.read<CartBloc>().add(const ClearCart());
       return;
     }
-    
+
     // Get items from active table only
     final activeTableItems = _tableCarts[_activeTableNumber] ?? [];
-    
+
     // Update the cart bloc with active table's items
     context.read<CartBloc>().add(const ClearCart());
     for (final item in activeTableItems) {
@@ -145,42 +238,43 @@ class _POSContentState extends State<_POSContent> {
       }
     }
   }
-  
+
   /// Get discount percentage for the active table
   double get _displayDiscountPercentage {
     if (_activeTableNumber == null) return 0.0;
     return _tableDiscounts[_activeTableNumber] ?? 0.0;
   }
-  
+
   /// Check if two item lists are equal
   bool _areItemsEqual(List<CartItem> list1, List<CartItem> list2) {
     if (list1.length != list2.length) return false;
-    
+
     final map1 = {for (var item in list1) item.id: item};
     final map2 = {for (var item in list2) item.id: item};
-    
+
     if (map1.length != map2.length) return false;
-    
+
     for (final entry in map1.entries) {
       final item2 = map2[entry.key];
-      if (item2 == null || 
+      if (item2 == null ||
           item2.quantity != entry.value.quantity ||
           item2.price != entry.value.price ||
           item2.name != entry.value.name) {
         return false;
       }
     }
-    
+
     return true;
   }
 
   /// Helper method to check if any selected table is a regular table (not takeaway/delivery/hospitality)
   bool _hasRegularTable() {
-    return _selectedTableNumbers.any((table) => 
-      table != 'takeaway' && 
-      table != 'delivery' && 
-      table != 'hospitality' &&
-      int.tryParse(table) != null
+    return _selectedTableNumbers.any(
+      (table) =>
+          table != 'takeaway' &&
+          table != 'delivery' &&
+          table != 'hospitality' &&
+          int.tryParse(table) != null,
     );
   }
 
@@ -206,25 +300,29 @@ class _POSContentState extends State<_POSContent> {
     try {
       final dbHelper = DatabaseHelper();
       final tableItems = _tableCarts[tableNumber] ?? [];
-      
+
       if (tableItems.isEmpty) {
         // Delete pending invoice if cart is empty
         await dbHelper.deletePendingInvoiceByTableNumbers([tableNumber]);
         return;
       }
-      
-      final items = tableItems.map((item) => {
-        'id': item.id,
-        'name': item.name,
-        'price': item.price,
-        'quantity': item.quantity,
-      }).toList();
-      
+
+      final items = tableItems
+          .map(
+            (item) => {
+              'id': item.id,
+              'name': item.name,
+              'price': item.price,
+              'quantity': item.quantity,
+            },
+          )
+          .toList();
+
       final tableOrderNumbers = <String, int>{};
       if (_tableOrderNumbers.containsKey(tableNumber)) {
         tableOrderNumbers[tableNumber] = _tableOrderNumbers[tableNumber]!;
       }
-      
+
       await dbHelper.savePendingInvoice(
         tableNumbers: [tableNumber],
         items: items,
@@ -239,26 +337,29 @@ class _POSContentState extends State<_POSContent> {
       debugPrint('Error saving pending invoice for table $tableNumber: $e');
     }
   }
-  
+
   /// Save pending invoices for all selected tables
   Future<void> _savePendingInvoices() async {
     for (final tableNumber in _selectedTableNumbers) {
       await _savePendingInvoiceForTable(tableNumber);
     }
   }
-  
+
   /// Generate order number for a table if it doesn't have one
   Future<void> _ensureOrderNumberForTable(String tableNumber) async {
     if (_tableOrderNumbers.containsKey(tableNumber)) return;
-    
+
     // Use repository instead of direct DatabaseHelper call
-    final salesRepository = context.read<DatabaseHelper>(); // Temporarily using DatabaseHelper as it implements the logic
+    final salesRepository = context
+        .read<
+          DatabaseHelper
+        >(); // Temporarily using DatabaseHelper as it implements the logic
     final nextOrderNumber = await salesRepository.getNextOrderNumber();
-    
+
     setState(() {
       _tableOrderNumbers[tableNumber] = nextOrderNumber;
     });
-    
+
     // Save pending invoice after generating order number
     _savePendingInvoiceForTable(tableNumber);
   }
@@ -266,7 +367,7 @@ class _POSContentState extends State<_POSContent> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return BlocListener<CartBloc, CartState>(
       listener: (context, cartState) {
         // Sync CartBloc changes back to _tableCarts
@@ -289,9 +390,9 @@ class _POSContentState extends State<_POSContent> {
               itemsMap[item.id] = item;
             }
           }
-          
+
           final updatedItems = itemsMap.values.toList();
-          
+
           // Only update if items actually changed to avoid infinite loops
           final currentItems = _tableCarts[_activeTableNumber!] ?? [];
           if (!_areItemsEqual(currentItems, updatedItems)) {
@@ -299,7 +400,7 @@ class _POSContentState extends State<_POSContent> {
               // Update _tableCarts - this can be an empty list if all items are deleted
               _tableCarts[_activeTableNumber!] = updatedItems;
             });
-            
+
             // Save pending invoice after cart changes (even if cart is empty)
             // This ensures the pending invoice is updated/deleted as needed
             _savePendingInvoiceForTable(_activeTableNumber!);
@@ -307,316 +408,391 @@ class _POSContentState extends State<_POSContent> {
         }
       },
       child: BlocBuilder<CartBloc, CartState>(
-      builder: (context, cartState) {
-        return Row(
-          children: [
-            // Table Selection Menu
-            POSTableMenu(
-              selectedTableNumbers: _selectedTableNumbers,
-              onTableSelected: (tableNumbers) async {
-                final previousTables = List<String>.from(_selectedTableNumbers);
-                final isTableRemoved = tableNumbers.length < previousTables.length;
-                
-                // If a table was removed, save current state before clearing
-                if (isTableRemoved) {
-                  await _savePendingInvoices();
-                }
-                
-                setState(() {
-                  _selectedTableNumbers = tableNumbers;
-                  
-                  // Set active table to the last selected table (or first if only one)
-                  if (tableNumbers.isNotEmpty) {
-                    _activeTableNumber = tableNumbers.last;
-                  } else {
-                    _activeTableNumber = null;
-                    _selectedCategoryId = null;
-                    _selectedSubCategoryId = null;
-                      context.read<CartBloc>().add(const ClearCart());
-                    }
-                });
-                
-                // Load pending invoices for new table selection
-                if (tableNumbers.isNotEmpty && !isTableRemoved) {
-                  // Load pending invoices for all newly selected tables
-                  for (final tableNumber in tableNumbers) {
-                    // Always load to ensure we have the latest data
-                    await _loadPendingInvoiceForTable(tableNumber);
-                
-                    // Generate order number if needed
-                    if (!_tableOrderNumbers.containsKey(tableNumber)) {
-                      await _ensureOrderNumberForTable(tableNumber);
-                    }
-                  }
-                  
-                  // Update display cart for active table after loading
-                  if (mounted) {
-                    _updateDisplayCart();
-                  }
-                }
-              },
-            ),
-            // Selected Tables Widget
-            if (_selectedTableNumbers.isNotEmpty)
-              POSSelectedTables(
+        builder: (context, cartState) {
+          return Row(
+            children: [
+              // Table Selection Menu
+              POSTableMenu(
                 selectedTableNumbers: _selectedTableNumbers,
-                activeTableNumber: _activeTableNumber,
-                tableItemCounts: Map.fromEntries(
-                  _selectedTableNumbers.map((tableNumber) {
-                    final items = _tableCarts[tableNumber] ?? [];
-                    final totalCount = items.fold(0, (sum, item) => sum + item.quantity);
-                    return MapEntry(tableNumber, totalCount);
-                  }),
-                ),
-                onTableSelected: (tableNumber) {
-                  // Switch active table
-                  setState(() {
-                    _activeTableNumber = tableNumber;
-                  });
-                  _updateDisplayCart();
-                },
-                onTableRemoved: (tableNumber) async {
-                  // Prevent removing table if it has items in cart
-                  final tableItems = _tableCarts[tableNumber] ?? [];
-                  if (tableItems.isNotEmpty) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Cannot remove table with items in cart. Please clear cart first or complete payment.'),
-                          backgroundColor: AppColors.warning,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                    return;
+                onTableSelected: (tableNumbers) async {
+                  final previousTables = List<String>.from(
+                    _selectedTableNumbers,
+                  );
+                  final isTableRemoved =
+                      tableNumbers.length < previousTables.length;
+
+                  // If a table was removed, save current state before clearing
+                  if (isTableRemoved) {
+                    await _savePendingInvoices();
                   }
-                  
-                  final newTables = List<String>.from(_selectedTableNumbers)
-                    ..remove(tableNumber);
-                  
-                  // Save current state before removing table
-                  await _savePendingInvoices();
-                  
+
                   setState(() {
-                    _selectedTableNumbers = newTables;
-                    if (newTables.isEmpty) {
+                    _selectedTableNumbers = tableNumbers;
+
+                    // Set active table to the last selected table (or first if only one)
+                    if (tableNumbers.isNotEmpty) {
+                      _activeTableNumber = tableNumbers.last;
+                    } else {
                       _activeTableNumber = null;
                       _selectedCategoryId = null;
                       _selectedSubCategoryId = null;
                       context.read<CartBloc>().add(const ClearCart());
-                    } else {
-                      // Set active table to last remaining table
-                      _activeTableNumber = newTables.last;
-                      // Load pending invoices for remaining tables
-                      _loadPendingInvoicesForTables(newTables);
-                }
+                    }
                   });
-              },
-            ),
-            // Categories and SubCategories Sidebar
-            Container(
-              width: 220,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                border: Border(
-                  right: BorderSide(color: AppColors.border),
-                ),
+
+                  // Load pending invoices for new table selection
+                  if (tableNumbers.isNotEmpty && !isTableRemoved) {
+                    // Load pending invoices for all newly selected tables
+                    for (final tableNumber in tableNumbers) {
+                      // Always load to ensure we have the latest data
+                      await _loadPendingInvoiceForTable(tableNumber);
+
+                      // Generate order number if needed
+                      if (!_tableOrderNumbers.containsKey(tableNumber)) {
+                        await _ensureOrderNumberForTable(tableNumber);
+                      }
+                    }
+
+                    // Update display cart for active table after loading
+                    if (mounted) {
+                      _updateDisplayCart();
+                    }
+                  }
+                },
               ),
-              child: _selectedTableNumbers.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.table_restaurant_outlined,
-                              size: 64,
-                              color: AppColors.textSecondary.withValues(alpha: 0.5),
+              // Selected Tables Widget
+              if (_selectedTableNumbers.isNotEmpty)
+                POSSelectedTables(
+                  selectedTableNumbers: _selectedTableNumbers,
+                  activeTableNumber: _activeTableNumber,
+                  tableItemCounts: Map.fromEntries(
+                    _selectedTableNumbers.map((tableNumber) {
+                      final items = _tableCarts[tableNumber] ?? [];
+                      final totalCount = items.fold(
+                        0,
+                        (sum, item) => sum + item.quantity,
+                      );
+                      return MapEntry(tableNumber, totalCount);
+                    }),
+                  ),
+                  onTableSelected: (tableNumber) {
+                    // Switch active table
+                    setState(() {
+                      _activeTableNumber = tableNumber;
+                    });
+                    _updateDisplayCart();
+                  },
+                  onTableRemoved: (tableNumber) async {
+                    // Prevent removing table if it has items in cart
+                    final tableItems = _tableCarts[tableNumber] ?? [];
+                    if (tableItems.isNotEmpty) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Cannot remove table with items in cart. Please clear cart first or complete payment.',
                             ),
-                            const SizedBox(height: AppSpacing.md),
-                            Text(
-                              l10n.selectTable,
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.bodyLarge.copyWith(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w500,
+                            backgroundColor: AppColors.warning,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    final newTables = List<String>.from(_selectedTableNumbers)
+                      ..remove(tableNumber);
+
+                    // Save current state before removing table
+                    await _savePendingInvoices();
+
+                    setState(() {
+                      _selectedTableNumbers = newTables;
+                      if (newTables.isEmpty) {
+                        _activeTableNumber = null;
+                        _selectedCategoryId = null;
+                        _selectedSubCategoryId = null;
+                        context.read<CartBloc>().add(const ClearCart());
+                      } else {
+                        // Set active table to last remaining table
+                        _activeTableNumber = newTables.last;
+                        // Load pending invoices for remaining tables
+                        _loadPendingInvoicesForTables(newTables);
+                      }
+                    });
+                  },
+                ),
+              // Categories and SubCategories Sidebar
+              Container(
+                width: 220,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(right: BorderSide(color: AppColors.border)),
+                ),
+                child: _selectedTableNumbers.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.table_restaurant_outlined,
+                                size: 64,
+                                color: AppColors.textSecondary.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                l10n.selectTable,
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodyLarge.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                'Please select a table to start an order',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: POSCategoriesMenu(
+                              selectedCategoryId: _selectedCategoryId,
+                              onCategorySelected: (value) {
+                                setState(() {
+                                  _selectedCategoryId = value;
+                                  _selectedSubCategoryId = null;
+                                });
+                              },
+                            ),
+                          ),
+                          if (_selectedCategoryId != null) ...[
+                            const Divider(height: 1, thickness: 1),
+                            Expanded(
+                              flex: 2,
+                              child: POSSubCategoriesMenu(
+                                selectedCategoryId: _selectedCategoryId,
+                                selectedSubCategoryId: _selectedSubCategoryId,
+                                onSubCategorySelected: (value) {
+                                  setState(() {
+                                    _selectedSubCategoryId = value;
+                                  });
+                                },
                               ),
                             ),
-                            const SizedBox(height: AppSpacing.sm),
+                          ],
+                        ],
+                      ),
+              ),
+              // Items Grid (if subcategory selected and table is selected)
+              if (_selectedTableNumbers.isNotEmpty &&
+                  _selectedSubCategoryId != null)
+                Expanded(
+                  child: POSItemsGrid(
+                    selectedSubCategoryId: _selectedSubCategoryId,
+                    onItemTap: (item) {
+                      _addItemToCart(context, item);
+                      // Auto-save pending invoices after adding item
+                      _savePendingInvoices();
+                    },
+                  ),
+                )
+              else if (_selectedTableNumbers.isEmpty)
+                // Placeholder when no table is selected
+                Expanded(
+                  child: Container(
+                    color: AppColors.background,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.table_restaurant_outlined,
+                            size: 96,
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            l10n.selectTable,
+                            style: AppTextStyles.titleLarge.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Please select a table to start an order',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.7,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              // Cart Sidebar (only show when items are in cart)
+              if (cartState.items.isNotEmpty)
+                Container(
+                  width: 400,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.shadow,
+                        blurRadius: 10,
+                        offset: const Offset(-2, 0),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.shopping_cart,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: AppSpacing.md),
                             Text(
-                              'Please select a table to start an order',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                              '${l10n.cart} (${cartState.itemCount})',
+                              style: AppTextStyles.titleLarge.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    )
-                  : Column(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: POSCategoriesMenu(
-                            selectedCategoryId: _selectedCategoryId,
-                            onCategorySelected: (value) {
-                              setState(() {
-                                _selectedCategoryId = value;
-                                _selectedSubCategoryId = null;
-                              });
-                            },
-                          ),
-                        ),
-                        if (_selectedCategoryId != null) ...[
-                          const Divider(height: 1, thickness: 1),
-                          Expanded(
-                            flex: 2,
-                            child: POSSubCategoriesMenu(
-                              selectedCategoryId: _selectedCategoryId,
-                              selectedSubCategoryId: _selectedSubCategoryId,
-                              onSubCategorySelected: (value) {
-                                setState(() {
-                                  _selectedSubCategoryId = value;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-            ),
-            // Items Grid (if subcategory selected and table is selected)
-            if (_selectedTableNumbers.isNotEmpty && _selectedSubCategoryId != null)
-              Expanded(
-                child: POSItemsGrid(
-                  selectedSubCategoryId: _selectedSubCategoryId,
-                  onItemTap: (item) {
-                    _addItemToCart(context, item);
-                    // Auto-save pending invoices after adding item
-                    _savePendingInvoices();
-                  },
-                ),
-              )
-            else if (_selectedTableNumbers.isEmpty)
-              // Placeholder when no table is selected
-              Expanded(
-                child: Container(
-                  color: AppColors.background,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.table_restaurant_outlined,
-                          size: 96,
-                          color: AppColors.textSecondary.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          l10n.selectTable,
-                          style: AppTextStyles.titleLarge.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Please select a table to start an order',
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: AppColors.textSecondary.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
+                      Expanded(child: POSCartItemsList()),
+                      POSCartFooter(
+                        allowPrinting: _allowPrinting,
+                        discountPercentage: _displayDiscountPercentage,
+                        canApplyDiscount: _canApplyDiscount,
+                        canProcessPayment: _canProcessPayment,
+                        canPrintInvoice: _canPrintInvoice,
+                        canClearCart: _canClearCart,
+                        onPrintingChanged: (value) {
+                          setState(() {
+                            _allowPrinting = value;
+                          });
+                        },
+                        onDiscountChanged: (value) async {
+                          if (!_canApplyDiscount) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('ليس لديك صلاحية تطبيق الخصم'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          if (_activeTableNumber != null) {
+                            setState(() {
+                              // Apply discount to active table only
+                              _tableDiscounts[_activeTableNumber!] = value;
+                            });
+                            await _savePendingInvoiceForTable(
+                              _activeTableNumber!,
+                            );
+                          }
+                        },
+                        onPrintCustomerInvoice: () {
+                          if (!_canPrintInvoice) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('ليس لديك صلاحية الطباعة'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          _printCustomerInvoice(context, cartState, l10n);
+                        },
+                        onPrintKitchenInvoice: () {
+                          if (!_canPrintInvoice) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('ليس لديك صلاحية الطباعة'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          _printKitchenInvoice(context, cartState, l10n);
+                        },
+                        onProcessPayment: () {
+                          if (!_canProcessPayment) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('ليس لديك صلاحية إتمام الدفع'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          _completePayment(context, 'cash', l10n);
+                        },
+                        onClearCart: () async {
+                          if (!_canClearCart) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('ليس لديك صلاحية مسح السلة'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          if (_activeTableNumber != null) {
+                            setState(() {
+                              // Clear cart for active table only
+                              _tableCarts[_activeTableNumber!] = [];
+                              _tableDiscounts[_activeTableNumber!] = 0.0;
+                            });
+                            await _savePendingInvoiceForTable(
+                              _activeTableNumber!,
+                            );
+                          }
+                          if (mounted) {
+                            context.read<CartBloc>().add(const ClearCart());
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            // Cart Sidebar (only show when items are in cart)
-            if (cartState.items.isNotEmpty)
-              Container(
-                width: 400,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 10,
-                      offset: const Offset(-2, 0),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.shopping_cart, color: Colors.white),
-                          const SizedBox(width: AppSpacing.md),
-                          Text(
-                            '${l10n.cart} (${cartState.itemCount})',
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: POSCartItemsList(),
-                    ),
-                    POSCartFooter(
-                      allowPrinting: _allowPrinting,
-                      discountPercentage: _displayDiscountPercentage,
-                      onPrintingChanged: (value) {
-                        setState(() {
-                          _allowPrinting = value;
-                        });
-                      },
-                      onDiscountChanged: (value) async {
-                        if (_activeTableNumber != null) {
-                        setState(() {
-                            // Apply discount to active table only
-                            _tableDiscounts[_activeTableNumber!] = value;
-                        });
-                          await _savePendingInvoiceForTable(_activeTableNumber!);
-                        }
-                      },
-                      onPrintCustomerInvoice: () => _printCustomerInvoice(context, cartState, l10n),
-                      onPrintKitchenInvoice: () => _printKitchenInvoice(context, cartState, l10n),
-                      onProcessPayment: () => _completePayment(context, 'cash', l10n),
-                      onClearCart: () async {
-                        if (_activeTableNumber != null) {
-                        setState(() {
-                            // Clear cart for active table only
-                            _tableCarts[_activeTableNumber!] = [];
-                            _tableDiscounts[_activeTableNumber!] = 0.0;
-                        });
-                          await _savePendingInvoiceForTable(_activeTableNumber!);
-                        }
-                        if (mounted) {
-                          context.read<CartBloc>().add(const ClearCart());
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
+            ],
+          );
+        },
       ),
     );
   }
@@ -638,38 +814,42 @@ class _POSContentState extends State<_POSContent> {
           ),
         );
       }
-      
+
       final subtotal = cartState.total;
       final discountAmount = subtotal * (_displayDiscountPercentage / 100);
       final finalTotal = subtotal - discountAmount;
-      
+
       // Calculate service charge and delivery tax
       final serviceChargeRate = await TaxSettingsHelper.loadServiceChargeRate();
       final serviceCharge = _hasRegularTable()
-                           ? finalTotal * serviceChargeRate
-                           : 0.0;
-      
+          ? finalTotal * serviceChargeRate
+          : 0.0;
+
       final deliveryTaxRate = await TaxSettingsHelper.loadDeliveryTaxRate();
       final deliveryTax = _hasDeliveryTable()
-                          ? finalTotal * deliveryTaxRate
-                          : 0.0;
-      
+          ? finalTotal * deliveryTaxRate
+          : 0.0;
+
       // Calculate hospitality discount (for hospitality orders) - applied as discount, not tax
-      final hospitalityTaxRate = await TaxSettingsHelper.loadHospitalityTaxRate();
+      final hospitalityTaxRate =
+          await TaxSettingsHelper.loadHospitalityTaxRate();
       final hospitalityDiscount = _hasHospitalityTable()
-                                  ? subtotal * hospitalityTaxRate
-                                  : 0.0;
-      
+          ? subtotal * hospitalityTaxRate
+          : 0.0;
+
       // Total discount includes both manual discount and hospitality discount
       final totalDiscountAmount = discountAmount + hospitalityDiscount;
-      
+
       // Use current order number from cart, or generate new one if not set
       final dbHelper = DatabaseHelper();
-      final orderNumber = cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
+      final orderNumber =
+          cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
       // Invoice number equals order number
       final invoiceNumber = orderNumber;
-      debugPrint('_printCustomerInvoice: Using orderNumber=$orderNumber, invoiceNumber=$invoiceNumber');
-      
+      debugPrint(
+        '_printCustomerInvoice: Using orderNumber=$orderNumber, invoiceNumber=$invoiceNumber',
+      );
+
       await InvoicePrinter.printCustomerInvoice(
         items: cartState.items,
         total: finalTotal + serviceCharge + deliveryTax,
@@ -677,13 +857,14 @@ class _POSContentState extends State<_POSContent> {
         discountAmount: totalDiscountAmount, // Includes hospitality discount
         serviceCharge: serviceCharge,
         deliveryTax: deliveryTax,
-        hospitalityTax: hospitalityDiscount, // Store as discount amount (using hospitalityTax field for backward compatibility)
+        hospitalityTax:
+            hospitalityDiscount, // Store as discount amount (using hospitalityTax field for backward compatibility)
         tableNumber: _getTableNumberString(),
         orderNumber: orderNumber.toString(),
         invoiceNumber: invoiceNumber.toString(),
         l10n: l10n,
       );
-      
+
       // Show success message
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -708,7 +889,7 @@ class _POSContentState extends State<_POSContent> {
       }
     }
   }
-  
+
   Future<void> _printKitchenInvoice(
     BuildContext context,
     CartState cartState,
@@ -725,19 +906,20 @@ class _POSContentState extends State<_POSContent> {
           ),
         );
       }
-      
+
       // Use current order number from cart, or generate new one if not set
       final dbHelper = DatabaseHelper();
-      final orderNumber = cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
+      final orderNumber =
+          cartState.orderNumber ?? await dbHelper.getNextOrderNumber();
       debugPrint('_printKitchenInvoice: Using orderNumber=$orderNumber');
-      
+
       await InvoicePrinter.printKitchenInvoice(
         items: cartState.items,
         tableNumber: _getTableNumberString(),
         orderNumber: orderNumber.toString(),
         l10n: l10n,
       );
-      
+
       // Show success message
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -762,7 +944,7 @@ class _POSContentState extends State<_POSContent> {
       }
     }
   }
-  
+
   Future<void> _completePayment(
     BuildContext context,
     String method,
@@ -782,7 +964,7 @@ class _POSContentState extends State<_POSContent> {
         }
         return;
       }
-      
+
       final activeTableItems = _tableCarts[_activeTableNumber] ?? [];
       if (activeTableItems.isEmpty) {
         if (context.mounted) {
@@ -811,54 +993,61 @@ class _POSContentState extends State<_POSContent> {
       // Get Blocs - they should be provided in main_screen.dart
       final salesBloc = context.read<SalesBloc>();
       final financialBloc = context.read<FinancialBloc>();
-      
+
       final paymentService = PaymentService(
         salesBloc: salesBloc,
         financialBloc: financialBloc,
       );
-      
+
       // Calculate tax rates
-      final hospitalityTaxRate = await TaxSettingsHelper.loadHospitalityTaxRate();
+      final hospitalityTaxRate =
+          await TaxSettingsHelper.loadHospitalityTaxRate();
       final serviceChargeRate = await TaxSettingsHelper.loadServiceChargeRate();
       final deliveryTaxRate = await TaxSettingsHelper.loadDeliveryTaxRate();
-      
+
       // Ensure active table has order number
       final dbHelper = DatabaseHelper();
       if (!_tableOrderNumbers.containsKey(_activeTableNumber)) {
         final nextOrderNumber = await dbHelper.getNextOrderNumber();
         _tableOrderNumbers[_activeTableNumber!] = nextOrderNumber;
       }
-      
+
       // Process payment for active table only
       final tableNumber = _activeTableNumber!;
       final tableItems = activeTableItems;
-      
+
       // Calculate totals for this table's cart
-      final tableSubtotal = tableItems.fold(0.0, (sum, item) => sum + item.total);
+      final tableSubtotal = tableItems.fold(
+        0.0,
+        (sum, item) => sum + item.total,
+      );
       final tableDiscountPercentage = _tableDiscounts[tableNumber] ?? 0.0;
-      final tableDiscountAmount = tableSubtotal * (tableDiscountPercentage / 100);
-      
+      final tableDiscountAmount =
+          tableSubtotal * (tableDiscountPercentage / 100);
+
       // Calculate hospitality discount for this table
       final tableHospitalityDiscount = tableNumber == 'hospitality'
           ? tableSubtotal * hospitalityTaxRate
-                                  : 0.0;
-      
+          : 0.0;
+
       // Total discount includes both manual discount and hospitality discount
-      final tableTotalDiscountAmount = tableDiscountAmount + tableHospitalityDiscount;
+      final tableTotalDiscountAmount =
+          tableDiscountAmount + tableHospitalityDiscount;
       final tableFinalTotal = tableSubtotal - tableTotalDiscountAmount;
-      
+
       // Calculate charges for this specific table
       double tableServiceCharge = 0.0;
       double tableDeliveryTax = 0.0;
-      
+
       if (tableNumber == 'delivery') {
         tableDeliveryTax = tableFinalTotal * deliveryTaxRate;
       } else if (int.tryParse(tableNumber) != null) {
         tableServiceCharge = tableFinalTotal * serviceChargeRate;
       }
-      
-      final tableTotalWithCharges = tableFinalTotal + tableServiceCharge + tableDeliveryTax;
-      
+
+      final tableTotalWithCharges =
+          tableFinalTotal + tableServiceCharge + tableDeliveryTax;
+
       final result = await paymentService.processPayment(
         items: tableItems,
         total: tableTotalWithCharges,
@@ -871,23 +1060,25 @@ class _POSContentState extends State<_POSContent> {
         hospitalityTax: tableHospitalityDiscount,
         l10n: l10n,
       );
-      
+
       // Show low stock warnings if any
       if (result.warnings.isNotEmpty && context.mounted) {
         _showLowStockWarnings(context, result.warnings);
       }
-      
-      debugPrint('_completePayment: Processed payment for active table: $tableNumber');
-      
+
+      debugPrint(
+        '_completePayment: Processed payment for active table: $tableNumber',
+      );
+
       // Wait a bit to ensure database save is complete
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Auto-print customer invoice if printing is enabled
       if (_allowPrinting) {
         try {
           // Print invoice for active table only
           final tableOrderNumber = _tableOrderNumbers[tableNumber]!;
-          
+
           await InvoicePrinter.printCustomerInvoice(
             items: tableItems,
             total: tableTotalWithCharges,
@@ -915,25 +1106,25 @@ class _POSContentState extends State<_POSContent> {
           }
         }
       }
-      
+
       // Clear cart for active table only (but keep table in selected list)
       if (!mounted) return;
-      
+
       // Delete pending invoice for active table after successful payment
       await dbHelper.deletePendingInvoiceByTableNumbers([tableNumber]);
-      
+
       // Remove the paid table from selected tables
       setState(() {
         _selectedTableNumbers.remove(tableNumber);
         _tableCarts.remove(tableNumber);
         _tableDiscounts.remove(tableNumber);
         _tableOrderNumbers.remove(tableNumber);
-        
+
         // If no tables remain, close all tables (clear everything)
         if (_selectedTableNumbers.isEmpty) {
           _activeTableNumber = null;
-        _selectedCategoryId = null;
-        _selectedSubCategoryId = null;
+          _selectedCategoryId = null;
+          _selectedSubCategoryId = null;
           if (mounted) {
             context.read<CartBloc>().add(const ClearCart());
           }
@@ -974,21 +1165,25 @@ class _POSContentState extends State<_POSContent> {
     if (_selectedTableNumbers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${AppLocalizations.of(context)!.selectTable} to start an order'),
+          content: Text(
+            '${AppLocalizations.of(context)!.selectTable} to start an order',
+          ),
           backgroundColor: AppColors.warning,
           duration: const Duration(seconds: 2),
         ),
       );
       return;
     }
-    
+
     // Add item to active table's cart only
     if (_activeTableNumber == null) return;
-    
+
     setState(() {
       final tableItems = _tableCarts[_activeTableNumber] ?? [];
-      final existingIndex = tableItems.indexWhere((cartItem) => cartItem.id == item.id);
-      
+      final existingIndex = tableItems.indexWhere(
+        (cartItem) => cartItem.id == item.id,
+      );
+
       if (existingIndex != -1) {
         // Update quantity if item exists
         tableItems[existingIndex] = CartItem(
@@ -999,28 +1194,33 @@ class _POSContentState extends State<_POSContent> {
         );
       } else {
         // Add new item
-        tableItems.add(CartItem(
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: 1,
-        ));
+        tableItems.add(
+          CartItem(
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: 1,
+          ),
+        );
       }
       _tableCarts[_activeTableNumber!] = tableItems;
     });
-    
+
     // Update display cart
     _updateDisplayCart();
-    
+
     // Save pending invoice for active table
     await _savePendingInvoiceForTable(_activeTableNumber!);
   }
 
-  void _showLowStockWarnings(BuildContext context, List<LowStockWarning> warnings) {
+  void _showLowStockWarnings(
+    BuildContext context,
+    List<LowStockWarning> warnings,
+  ) {
     // Separate critical and warning messages
     final criticalWarnings = warnings.where((w) => w.isCritical).toList();
     final regularWarnings = warnings.where((w) => !w.isCritical).toList();
-    
+
     // Show critical warnings first in a dialog
     if (criticalWarnings.isNotEmpty) {
       showDialog(
@@ -1043,35 +1243,12 @@ class _POSContentState extends State<_POSContent> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                ...criticalWarnings.map((warning) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error, color: AppColors.error, size: 20),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          warning.message,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-                if (regularWarnings.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  const Divider(),
-                  const SizedBox(height: AppSpacing.md),
-                  const Text(
-                    'تحذيرات أخرى:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ...regularWarnings.map((warning) => Padding(
+                ...criticalWarnings.map(
+                  (warning) => Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: Row(
                       children: [
-                        Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
+                        Icon(Icons.error, color: AppColors.error, size: 20),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
@@ -1081,7 +1258,38 @@ class _POSContentState extends State<_POSContent> {
                         ),
                       ],
                     ),
-                  )),
+                  ),
+                ),
+                if (regularWarnings.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const Divider(),
+                  const SizedBox(height: AppSpacing.md),
+                  const Text(
+                    'تحذيرات أخرى:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ...regularWarnings.map(
+                    (warning) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber,
+                            color: AppColors.warning,
+                            size: 20,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              warning.message,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ],
             ),

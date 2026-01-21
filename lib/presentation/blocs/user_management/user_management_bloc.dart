@@ -71,7 +71,11 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
         name: event.name,
       );
 
-      // Reload users
+      // Emit success then reload users
+      emit(const UserManagementSuccess('User created successfully'));
+      
+      // Reload users after a small delay to allow UI to show success
+      await Future.delayed(const Duration(milliseconds: 100));
       add(const LoadUsers());
     } catch (e) {
       emit(UserManagementError('Failed to create user: $e'));
@@ -107,14 +111,14 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
     LoadUserPermissions event,
     Emitter<UserManagementState> emit,
   ) async {
-    if (state is! UserManagementLoaded) return;
+    final currentState = state;
+    if (currentState is! UserManagementLoaded) return;
 
     try {
       // Load permissions for the user
       final permissions = await _repository.getUserPermissions(event.userId);
 
       // Update state with selected user
-      final currentState = state as UserManagementLoaded;
       final updatedPermissions = Map<String, List<UserPermission>>.from(
         currentState.userPermissions,
       );
@@ -133,7 +137,9 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
     UpdateUserPermission event,
     Emitter<UserManagementState> emit,
   ) async {
-    if (state is! UserManagementLoaded) return;
+    // Store current state before any async operations
+    final currentState = state;
+    if (currentState is! UserManagementLoaded) return;
 
     try {
       // Check if user is admin
@@ -150,8 +156,7 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
         event.allowed,
       );
 
-      // Update local state
-      final currentState = state as UserManagementLoaded;
+      // Update local state using the stored currentState
       final updatedPermissions = Map<String, List<UserPermission>>.from(
         currentState.userPermissions,
       );
@@ -194,8 +199,8 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
       final savedPermissions = await _repository.getUserPermissions(event.userId);
       final savedPermsMap = <String, List<UserPermission>>{};
       savedPermsMap[event.userId] = savedPermissions;
-      final finalState = state as UserManagementLoaded;
-      emit(finalState.copyWith(
+      // Use currentState which we stored at the beginning
+      emit(currentState.copyWith(
         userPermissions: {...updatedPermissions, ...savedPermsMap},
       ));
     } catch (e) {
@@ -232,11 +237,12 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
     CheckAdminStatus event,
     Emitter<UserManagementState> emit,
   ) async {
+    final currentState = state;
     try {
       final isAdmin = await _repository.isCurrentUserAdmin();
       
-      if (state is UserManagementLoaded) {
-        emit((state as UserManagementLoaded).copyWith(isAdmin: isAdmin));
+      if (currentState is UserManagementLoaded) {
+        emit(currentState.copyWith(isAdmin: isAdmin));
       } else {
         emit(UserManagementLoaded(
           users: [],
@@ -246,8 +252,8 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
       }
     } catch (e) {
       // Silently fail, assume not admin
-      if (state is UserManagementLoaded) {
-        emit((state as UserManagementLoaded).copyWith(isAdmin: false));
+      if (currentState is UserManagementLoaded) {
+        emit(currentState.copyWith(isAdmin: false));
       }
     }
   }

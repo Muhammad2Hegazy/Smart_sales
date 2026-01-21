@@ -14,6 +14,10 @@ import '../../../blocs/cart/cart_state.dart';
 class POSCartFooter extends StatefulWidget {
   final bool allowPrinting;
   final double discountPercentage;
+  final bool canApplyDiscount;
+  final bool canProcessPayment;
+  final bool canPrintInvoice;
+  final bool canClearCart;
   final ValueChanged<bool> onPrintingChanged;
   final Future<void> Function(double) onDiscountChanged;
   final VoidCallback onPrintCustomerInvoice;
@@ -25,6 +29,10 @@ class POSCartFooter extends StatefulWidget {
     super.key,
     required this.allowPrinting,
     required this.discountPercentage,
+    this.canApplyDiscount = true,
+    this.canProcessPayment = true,
+    this.canPrintInvoice = true,
+    this.canClearCart = true,
     required this.onPrintingChanged,
     required this.onDiscountChanged,
     required this.onPrintCustomerInvoice,
@@ -44,8 +52,8 @@ class _POSCartFooterState extends State<POSCartFooter> {
   void initState() {
     super.initState();
     _discountController = TextEditingController(
-      text: widget.discountPercentage > 0 
-          ? CurrencyFormatter.formatDouble(widget.discountPercentage, 1) 
+      text: widget.discountPercentage > 0
+          ? CurrencyFormatter.formatDouble(widget.discountPercentage, 1)
           : '',
     );
   }
@@ -56,13 +64,15 @@ class _POSCartFooterState extends State<POSCartFooter> {
     // Only update controller if discount changed from outside (not from user typing)
     if (widget.discountPercentage != oldWidget.discountPercentage) {
       final currentText = _discountController.text;
-      final expectedText = widget.discountPercentage > 0 
+      final expectedText = widget.discountPercentage > 0
           ? CurrencyFormatter.formatDouble(widget.discountPercentage, 1)
           : '';
       // Only update if the text doesn't match (to avoid interfering with typing)
-      if (currentText != expectedText && 
-          (currentText.isEmpty || double.tryParse(currentText) == null || 
-           (double.tryParse(currentText) ?? 0) != widget.discountPercentage)) {
+      if (currentText != expectedText &&
+          (currentText.isEmpty ||
+              double.tryParse(currentText) == null ||
+              (double.tryParse(currentText) ?? 0) !=
+                  widget.discountPercentage)) {
         _discountController.text = expectedText;
       }
     }
@@ -77,14 +87,14 @@ class _POSCartFooterState extends State<POSCartFooter> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return BlocBuilder<CartBloc, CartState>(
       builder: (context, cartState) {
         // Calculate discount and final total
         final subtotal = cartState.total;
         final discountAmount = subtotal * (widget.discountPercentage / 100);
         final finalTotal = subtotal - discountAmount;
-        
+
         return Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
@@ -121,17 +131,25 @@ class _POSCartFooterState extends State<POSCartFooter> {
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              
+
               // Discount Input Row
               TextField(
                 controller: _discountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                enabled: widget.canApplyDiscount,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],
                 decoration: InputDecoration(
                   labelText: 'Discount %',
-                  helperText: 'Enter 1-100 for discount percentage',
+                  helperText: widget.canApplyDiscount
+                      ? 'Enter 1-100 for discount percentage'
+                      : 'ليس لديك صلاحية',
+                  helperStyle: widget.canApplyDiscount
+                      ? null
+                      : TextStyle(color: AppColors.error),
                   suffixText: '%',
                   border: const OutlineInputBorder(),
                   contentPadding: const EdgeInsets.symmetric(
@@ -140,16 +158,20 @@ class _POSCartFooterState extends State<POSCartFooter> {
                   ),
                   isDense: true,
                 ),
-                style: AppTextStyles.bodyMedium,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: widget.canApplyDiscount
+                      ? null
+                      : AppColors.textSecondary,
+                ),
                 onChanged: (value) async {
                   if (value.isEmpty) {
                     await widget.onDiscountChanged(0.0);
                     return;
                   }
-                  
+
                   // Parse the value
                   final discount = double.tryParse(value) ?? 0.0;
-                  
+
                   // Only clamp if value exceeds 100, otherwise just update
                   if (discount > 100.0) {
                     // Only update controller if it doesn't already show 100
@@ -170,7 +192,7 @@ class _POSCartFooterState extends State<POSCartFooter> {
                   }
                 },
               ),
-              
+
               // Discount Amount Row (if discount > 0)
               if (widget.discountPercentage > 0) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -201,11 +223,11 @@ class _POSCartFooterState extends State<POSCartFooter> {
                   ],
                 ),
               ],
-              
+
               const SizedBox(height: AppSpacing.md),
               const Divider(),
               const SizedBox(height: AppSpacing.md),
-              
+
               // Final Total Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -234,63 +256,93 @@ class _POSCartFooterState extends State<POSCartFooter> {
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
-              
+
               // Allow Printing Checkbox
-              Row(
-                children: [
-                  Checkbox(
-                    value: widget.allowPrinting,
-                    onChanged: (value) => widget.onPrintingChanged(value ?? false),
-                  ),
-                  Expanded(
-                    child: Text(
-                      l10n.allowPrinting,
-                      style: AppTextStyles.bodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              Opacity(
+                opacity: widget.canPrintInvoice ? 1.0 : 0.5,
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: widget.allowPrinting,
+                      onChanged: widget.canPrintInvoice
+                          ? (value) => widget.onPrintingChanged(value ?? false)
+                          : null,
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: Text(
+                        l10n.allowPrinting,
+                        style: AppTextStyles.bodyMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
-              
+
               // Print Buttons
-              AppButton(
-                label: l10n.printCustomerInvoice,
-                onPressed: cartState.items.isEmpty ? null : widget.onPrintCustomerInvoice,
-                type: AppButtonType.outline,
-                icon: Icons.print,
-                isFullWidth: true,
+              Opacity(
+                opacity: widget.canPrintInvoice ? 1.0 : 0.5,
+                child: AppButton(
+                  label: l10n.printCustomerInvoice,
+                  onPressed:
+                      (cartState.items.isEmpty || !widget.canPrintInvoice)
+                      ? null
+                      : widget.onPrintCustomerInvoice,
+                  type: AppButtonType.outline,
+                  icon: Icons.print,
+                  isFullWidth: true,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              AppButton(
-                label: l10n.printKitchenInvoice,
-                onPressed: cartState.items.isEmpty ? null : widget.onPrintKitchenInvoice,
-                type: AppButtonType.outline,
-                icon: Icons.restaurant,
-                isFullWidth: true,
+              Opacity(
+                opacity: widget.canPrintInvoice ? 1.0 : 0.5,
+                child: AppButton(
+                  label: l10n.printKitchenInvoice,
+                  onPressed:
+                      (cartState.items.isEmpty || !widget.canPrintInvoice)
+                      ? null
+                      : widget.onPrintKitchenInvoice,
+                  type: AppButtonType.outline,
+                  icon: Icons.restaurant,
+                  isFullWidth: true,
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
-              
+
               // Pay Button
-              AppButton(
-                label: l10n.pay,
-                onPressed: cartState.items.isEmpty ? null : widget.onProcessPayment,
-                type: AppButtonType.secondary,
-                isFullWidth: true,
+              Opacity(
+                opacity: widget.canProcessPayment ? 1.0 : 0.5,
+                child: AppButton(
+                  label: widget.canProcessPayment
+                      ? l10n.pay
+                      : 'ليس لديك صلاحية الدفع',
+                  onPressed:
+                      (cartState.items.isEmpty || !widget.canProcessPayment)
+                      ? null
+                      : widget.onProcessPayment,
+                  type: AppButtonType.secondary,
+                  isFullWidth: true,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              
+
               // Clear Cart Button
-              AppButton(
-                label: l10n.clearCart,
-                onPressed: cartState.items.isEmpty ? null : () async {
-                  if (widget.onClearCart != null) {
-                    await widget.onClearCart!();
-                  }
-                },
-                type: AppButtonType.outline,
-                isFullWidth: true,
+              Opacity(
+                opacity: widget.canClearCart ? 1.0 : 0.5,
+                child: AppButton(
+                  label: l10n.clearCart,
+                  onPressed: (cartState.items.isEmpty || !widget.canClearCart)
+                      ? null
+                      : () async {
+                          if (widget.onClearCart != null) {
+                            await widget.onClearCart!();
+                          }
+                        },
+                  type: AppButtonType.outline,
+                  isFullWidth: true,
+                ),
               ),
             ],
           ),
@@ -299,4 +351,3 @@ class _POSCartFooterState extends State<POSCartFooter> {
     );
   }
 }
-

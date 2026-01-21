@@ -527,6 +527,18 @@ abstract class AppLocalizations {
   /// **'Cashier'**
   String get cashier;
 
+  /// No description provided for @admin.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get admin;
+
+  /// No description provided for @manager.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager'**
+  String get manager;
+
   /// No description provided for @paymentMethod.
   ///
   /// In en, this message translates to:

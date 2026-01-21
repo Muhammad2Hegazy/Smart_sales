@@ -3,27 +3,36 @@ part of 'database_helper.dart';
 extension DatabaseHelperUsers on DatabaseHelper {
   // User Profiles CRUD (Local Auth)
   Future<void> insertUserProfile(UserProfile profile, String passwordHash) async {
+    debugPrint('DB: Inserting user profile for ${profile.username}');
     final db = await database;
     final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
     
     // Insert user profile
+    final profileMap = profile.toMap();
+    debugPrint('DB: Profile map: $profileMap');
     batch.insert(
       'user_profiles',
-      profile.toMap(),
+      profileMap,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     
     // Insert password hash
+    final passwordMap = {
+      'user_id': profile.userId,
+      'password_hash': passwordHash,
+      'created_at': now,
+      'updated_at': now,
+    };
+    debugPrint('DB: Password map (without hash): user_id=${profile.userId}');
     batch.insert(
       'user_passwords',
-      {
-        'user_id': profile.userId,
-        'password_hash': passwordHash,
-      },
+      passwordMap,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     
     await batch.commit(noResult: true);
+    debugPrint('DB: User profile and password inserted successfully');
   }
 
   Future<UserProfile?> getUserProfile(String userId) async {

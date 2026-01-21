@@ -73,9 +73,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = await _authRepository.signIn(
         username: event.username,
         password: event.password,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Sign in timed out. Please try again.');
+        },
       );
       emit(AuthAuthenticated(user));
     } catch (e) {
+      debugPrint('Sign in error: $e');
       emit(AuthError('Sign in failed: $e'));
     }
   }

@@ -225,6 +225,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashier => 'Cashier';
 
   @override
+  String get admin => 'Admin';
+
+  @override
+  String get manager => 'Manager';
+
+  @override
   String get paymentMethod => 'Select Payment Method:';
 
   @override

@@ -34,7 +34,7 @@ class UserProfile {
   /// Convert to Map for Database
   Map<String, dynamic> toMap() {
     return {
-      'id': userId,
+      'user_id': userId,
       'username': username,
       'role': role,
       'created_at': createdAt.toIso8601String(),

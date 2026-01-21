@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../database/database_helper.dart';
 import '../models/user_permission.dart';
@@ -42,6 +43,7 @@ class PermissionService {
       _permissionsCache![perm.permissionKey] = perm.allowed;
     }
     _cachedUserId = userId;
+    debugPrint('Loaded ${permissions.length} permissions for user $userId');
   }
 
   /// Clear permission cache (call after permission updates)
@@ -67,7 +69,7 @@ class PermissionService {
   }
 
   /// Check if current user can access a specific menu item/page
-  /// menuItem: 'pos', 'inventory', 'items', 'reports', 'profitLoss', 'settings'
+  /// menuItem: 'pos', 'purchaseInvoice', 'inventory', 'items', 'reports', 'profitLoss', 'settings'
   Future<bool> canAccessPage(String menuItem) async {
     final userId = await _getCurrentUserId();
     if (userId == null) return false;
@@ -90,7 +92,7 @@ class PermissionService {
       case 'pos':
         return PermissionKeys.accessPosScreen;
       case 'purchaseInvoice':
-        return PermissionKeys.accessPosScreen; // Use same permission as POS for now
+        return PermissionKeys.registerPurchaseInvoice;
       case 'items':
         return PermissionKeys.accessItemsScreen;
       case 'inventory':
@@ -117,7 +119,27 @@ class PermissionService {
       }
     }
 
+    debugPrint('Accessible menu items: $accessibleItems');
     return accessibleItems;
+  }
+
+  /// Check if current user can perform a specific action
+  Future<bool> canPerformAction(String actionPermissionKey) async {
+    return await hasPermission(actionPermissionKey);
+  }
+
+  /// Get list of allowed actions for a module
+  Future<List<String>> getAllowedActionsForModule(String module) async {
+    final modulePermissions = PermissionKeys.getPermissionsByModule(module);
+    final allowedActions = <String>[];
+
+    for (final permKey in modulePermissions) {
+      if (await hasPermission(permKey)) {
+        allowedActions.add(permKey);
+      }
+    }
+
+    return allowedActions;
   }
 }
 

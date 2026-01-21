@@ -76,25 +76,39 @@ class AuthLocalDataSource {
     required String username,
     required String password,
   }) async {
+    debugPrint('Starting sign in for user: $username');
+    
     final profile = await _dbHelper.getUserProfileByUsername(username);
     if (profile == null) {
+      debugPrint('User profile not found');
       throw Exception('Invalid username or password');
     }
+    debugPrint('User profile found: ${profile.userId}');
 
     final storedPasswordHash = await _dbHelper.getUserPasswordHash(profile.userId);
     if (storedPasswordHash == null) {
+      debugPrint('Password hash not found');
       throw Exception('Invalid username or password');
     }
 
     final hashedPassword = _hashPassword(password);
     if (hashedPassword != storedPasswordHash) {
+      debugPrint('Password mismatch');
       throw Exception('Invalid username or password');
     }
+    debugPrint('Password verified');
 
     // Check MAC address - allow login only if device MAC address is registered
     // Developer MAC address is always allowed
     // STRICT: No fallbacks - MAC must be detected and must be developer MAC or registered device
-    final currentMacAddress = await MacAddressHelper.getMacAddress();
+    debugPrint('Getting MAC address...');
+    final currentMacAddress = await MacAddressHelper.getMacAddress().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('MAC address detection timed out');
+        return null;
+      },
+    );
     debugPrint('Detected MAC address: $currentMacAddress');
 
     // If MAC address detection failed, deny login
@@ -138,11 +152,19 @@ class AuthLocalDataSource {
       debugPrint('Device found in database: ${device.deviceName}');
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    debugPrint('Saving user session...');
+    final prefs = await SharedPreferences.getInstance().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {
+        debugPrint('SharedPreferences timeout');
+        throw TimeoutException('Failed to save session');
+      },
+    );
     await prefs.setString(_keyCurrentUserId, profile.userId);
     await prefs.setString(_keyCurrentUsername, profile.username);
     await prefs.setString(_keyCurrentUserRole, profile.role);
     await prefs.setBool(_keyIsLoggedIn, true);
+    debugPrint('Session saved successfully');
 
     return UserModel(
       id: profile.userId,

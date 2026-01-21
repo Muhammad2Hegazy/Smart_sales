@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
-import '../../core/constants/app_constants.dart';
 import '../blocs/navigation/navigation_bloc.dart';
 import '../blocs/navigation/navigation_event.dart';
 import '../blocs/navigation/navigation_state.dart';
@@ -30,6 +28,7 @@ import '../../core/repositories/user_management_repository.dart';
 import '../../core/data_sources/local/user_management_local_data_source.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../blocs/auth/auth_event.dart';
+import '../blocs/auth/auth_state.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -274,10 +273,17 @@ class _MainScreenState extends State<MainScreen> {
             ),
             child: Column(
               children: [
-                FutureBuilder<String>(
-                  future: _getUsername(),
-                  builder: (context, snapshot) {
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, authState) {
                     final l10n = AppLocalizations.of(context)!;
+                    String username = l10n.user;
+                    String role = l10n.cashier;
+                    
+                    if (authState is AuthAuthenticated) {
+                      username = authState.user.name ?? authState.user.username;
+                      role = _getRoleDisplayName(authState.user.role, l10n);
+                    }
+                    
                     return Row(
                       children: [
                         CircleAvatar(
@@ -293,14 +299,16 @@ class _MainScreenState extends State<MainScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                snapshot.data ?? l10n.user,
+                                username,
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                               Text(
-                                l10n.cashier,
-                                style: AppTextStyles.bodySmall,
+                                role,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ],
                           ),
@@ -557,9 +565,17 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<String> _getUsername() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(AppConstants.keyUsername) ?? '';
+  String _getRoleDisplayName(String role, AppLocalizations l10n) {
+    switch (role.toLowerCase()) {
+      case 'admin':
+        return l10n.admin;
+      case 'cashier':
+        return l10n.cashier;
+      case 'manager':
+        return l10n.manager;
+      default:
+        return role;
+    }
   }
 
   Future<void> _handleLogout(BuildContext context) async {

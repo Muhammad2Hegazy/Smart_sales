@@ -68,6 +68,16 @@ class UserManagementLoaded extends UserManagementState {
   }
 }
 
+/// Success state for operations like user creation
+class UserManagementSuccess extends UserManagementState {
+  final String message;
+
+  const UserManagementSuccess(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
 /// Error state
 class UserManagementError extends UserManagementState {
   final String message;

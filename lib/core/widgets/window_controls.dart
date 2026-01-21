@@ -50,6 +50,15 @@ class _WindowControlsState extends State<WindowControls> with WindowListener {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+           _WindowButton(
+            icon: Icons.close_rounded,
+            tooltip: 'Close',
+            onPressed: () async {
+              await windowManager.close();
+            },
+            hoverColor: const Color(0xFFE81123),
+            iconColor: Colors.white.withValues(alpha: 0.9),
+          ),
           // Minimize Button
           _WindowButton(
             icon: Icons.horizontal_rule_rounded,
@@ -65,15 +74,7 @@ class _WindowControlsState extends State<WindowControls> with WindowListener {
             iconColor: Colors.white.withValues(alpha: 0.9),
           ),
           // Close Button (on the right)
-          _WindowButton(
-            icon: Icons.close_rounded,
-            tooltip: 'Close',
-            onPressed: () async {
-              await windowManager.close();
-            },
-            hoverColor: const Color(0xFFE81123),
-            iconColor: Colors.white.withValues(alpha: 0.9),
-          ),
+         
         ],
       ),
     );

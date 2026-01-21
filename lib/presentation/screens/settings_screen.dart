@@ -16,6 +16,9 @@ import '../../core/utils/printer_settings_helper.dart';
 import '../../core/models/printer_settings.dart';
 import '../../core/utils/tax_settings_helper.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/services/permission_service.dart';
+import '../../core/repositories/user_management_repository.dart';
+import '../../core/data_sources/local/user_management_local_data_source.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../blocs/product/product_bloc.dart';
@@ -56,13 +59,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedTheme = 'light'; // Use lowercase for consistency
   bool _isLoading = true;
 
+  // Permission state
+  late PermissionService _permissionService;
+  bool _canCreateUser = true;
+  bool _canEditUser = true;
+  bool _canManagePermissions = true;
+  bool _canImportData = true;
+  bool _canConfigureTax = true;
+  bool _canConfigurePrinter = true;
+
   @override
   void initState() {
     super.initState();
+    _initializePermissions();
     _loadSettings();
     // Load users if admin
     context.read<UserManagementBloc>().add(const CheckAdminStatus());
     context.read<UserManagementBloc>().add(const LoadUsers());
+  }
+
+  /// Initialize permission service and load permissions
+  Future<void> _initializePermissions() async {
+    final dbHelper = DatabaseHelper();
+    final userManagementLocalDataSource = UserManagementLocalDataSource();
+    final userManagementRepository = UserManagementRepository(
+      userManagementLocalDataSource,
+      dbHelper,
+    );
+    _permissionService = PermissionService(dbHelper, userManagementRepository);
+
+    try {
+      final results = await Future.wait([
+        _permissionService.hasPermission(PermissionKeys.settingsCreateUser),
+        _permissionService.hasPermission(PermissionKeys.settingsEditUser),
+        _permissionService.hasPermission(
+          PermissionKeys.settingsManagePermissions,
+        ),
+        _permissionService.hasPermission(PermissionKeys.settingsImportData),
+        _permissionService.hasPermission(PermissionKeys.settingsConfigureTax),
+        _permissionService.hasPermission(
+          PermissionKeys.settingsConfigurePrinter,
+        ),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _canCreateUser = results[0];
+          _canEditUser = results[1];
+          _canManagePermissions = results[2];
+          _canImportData = results[3];
+          _canConfigureTax = results[4];
+          _canConfigurePrinter = results[5];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading settings permissions: $e');
+    }
   }
 
   /// Get current user profile
@@ -95,53 +147,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return BlocBuilder<UserManagementBloc, UserManagementState>(
-      builder: (context, userMgmtState) {
-        final isAdmin =
-            userMgmtState is UserManagementLoaded && userMgmtState.isAdmin;
+    return BlocListener<UserManagementBloc, UserManagementState>(
+      listener: (context, state) {
+        if (state is UserManagementSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.userCreatedSuccessfully),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else if (state is UserManagementError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+      child: BlocBuilder<UserManagementBloc, UserManagementState>(
+        builder: (context, userMgmtState) {
+          final isAdmin =
+              userMgmtState is UserManagementLoaded && userMgmtState.isAdmin;
 
-        return DefaultTabController(
-          length: isAdmin ? 5 : 4, // Add User Management tab for admin
-          child: Scaffold(
-            backgroundColor: AppColors.background,
-            appBar: AppBar(
-              title: Text(l10n.settings),
-              bottom: TabBar(
-                isScrollable: true,
-                tabs: [
-                  Tab(
-                    text: l10n.generalSettings,
-                    icon: const Icon(Icons.settings_outlined),
-                  ),
-                  if (isAdmin)
+          return DefaultTabController(
+            length: isAdmin ? 5 : 4, // Add User Management tab for admin
+            child: Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: AppBar(
+                title: Text(l10n.settings),
+                bottom: TabBar(
+                  isScrollable: true,
+                  tabs: [
                     Tab(
-                      text: l10n.userManagement,
-                      icon: const Icon(Icons.people_outlined),
+                      text: l10n.generalSettings,
+                      icon: const Icon(Icons.settings_outlined),
                     ),
-                  Tab(
-                    text: l10n.devices,
-                    icon: const Icon(Icons.devices_outlined),
-                  ),
-                  Tab(text: l10n.sync, icon: const Icon(Icons.sync_outlined)),
-                  Tab(
-                    text: l10n.systemSettings,
-                    icon: const Icon(Icons.info_outlined),
-                  ),
+                    if (isAdmin)
+                      Tab(
+                        text: l10n.userManagement,
+                        icon: const Icon(Icons.people_outlined),
+                      ),
+                    Tab(
+                      text: l10n.devices,
+                      icon: const Icon(Icons.devices_outlined),
+                    ),
+                    Tab(text: l10n.sync, icon: const Icon(Icons.sync_outlined)),
+                    Tab(
+                      text: l10n.systemSettings,
+                      icon: const Icon(Icons.info_outlined),
+                    ),
+                  ],
+                ),
+              ),
+              body: TabBarView(
+                children: [
+                  _buildGeneralTab(context, l10n),
+                  if (isAdmin) _buildUserManagementTab(context, l10n),
+                  _buildDeviceManagementTab(context, l10n),
+                  _buildSyncTab(context, l10n),
+                  _buildSystemTab(context, l10n),
                 ],
               ),
             ),
-            body: TabBarView(
-              children: [
-                _buildGeneralTab(context, l10n),
-                if (isAdmin) _buildUserManagementTab(context, l10n),
-                _buildDeviceManagementTab(context, l10n),
-                _buildSyncTab(context, l10n),
-                _buildSystemTab(context, l10n),
-              ],
-            ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -242,31 +313,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
             (value) => setState(() => _selectedCurrency = value!),
             Icons.attach_money_outlined,
           ),
-          _buildDivider(),
-          _buildListTile(
-            l10n.taxSettings,
-            l10n.taxDescription,
-            Icons.receipt_long_outlined,
-            () => _showTaxSettings(context, l10n),
-          ),
-          _buildDivider(),
-          _buildListTile(
-            l10n.printerSettings,
-            l10n.receiptDescription,
-            Icons.print_outlined,
-            () => _showPrinterSettings(context, l10n),
-          ),
+          if (_canConfigureTax) ...[
+            _buildDivider(),
+            _buildListTile(
+              l10n.taxSettings,
+              l10n.taxDescription,
+              Icons.receipt_long_outlined,
+              () => _showTaxSettings(context, l10n),
+            ),
+          ],
+          if (_canConfigurePrinter) ...[
+            _buildDivider(),
+            _buildListTile(
+              l10n.printerSettings,
+              l10n.receiptDescription,
+              Icons.print_outlined,
+              () => _showPrinterSettings(context, l10n),
+            ),
+          ],
         ]),
-        const SizedBox(height: AppSpacing.lg),
-        _buildSectionHeader(l10n.dataImport),
-        _buildSettingsCard([
-          _buildListTile(
-            l10n.importRawMaterials,
-            'Import raw materials from Excel. These will appear in inventory.',
-            Icons.inventory_2_outlined,
-            () => _handleImportRawMaterials(context, l10n),
-          ),
-        ]),
+        if (_canImportData) ...[
+          const SizedBox(height: AppSpacing.lg),
+          _buildSectionHeader(l10n.dataImport),
+          _buildSettingsCard([
+            _buildListTile(
+              l10n.importRawMaterials,
+              'Import raw materials from Excel. These will appear in inventory.',
+              Icons.inventory_2_outlined,
+              () => _handleImportRawMaterials(context, l10n),
+            ),
+          ]),
+        ],
       ],
     );
   }
@@ -274,29 +351,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildUserManagementTab(BuildContext context, AppLocalizations l10n) {
     return BlocBuilder<UserManagementBloc, UserManagementState>(
       builder: (context, state) {
-        if (state is UserManagementInitial || state is UserManagementLoading) {
+        if (state is UserManagementLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is UserManagementInitial) {
           context.read<UserManagementBloc>().add(const LoadUsers());
           return const Center(child: CircularProgressIndicator());
         }
 
         if (state is UserManagementError) {
-          return Center(child: Text('Error: ${state.message}'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Error: ${state.message}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    context.read<UserManagementBloc>().add(const LoadUsers());
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
 
         if (state is UserManagementLoaded) {
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.md),
             children: [
-              _buildSectionHeader(l10n.createNewUser),
-              _buildSettingsCard([
-                _buildListTile(
-                  l10n.addUser,
-                  l10n.createNewUserAccount,
-                  Icons.person_add_outlined,
-                  () => _showCreateUserDialog(context, l10n),
-                ),
-              ]),
-              const SizedBox(height: AppSpacing.lg),
+              if (_canCreateUser) ...[
+                _buildSectionHeader(l10n.createNewUser),
+                _buildSettingsCard([
+                  _buildListTile(
+                    l10n.addUser,
+                    l10n.createNewUserAccount,
+                    Icons.person_add_outlined,
+                    () => _showCreateUserDialog(context, l10n),
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               _buildSectionHeader(l10n.users),
               _buildSettingsCard([
                 if (state.users.isEmpty)
@@ -319,28 +416,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.lock_reset,
-                                  color: AppColors.primary,
+                              if (_canEditUser)
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.lock_reset,
+                                    color: AppColors.primary,
+                                  ),
+                                  tooltip: l10n.changePassword,
+                                  onPressed: () =>
+                                      _showChangePasswordDialog(context, user),
                                 ),
-                                tooltip: l10n.changePassword,
-                                onPressed: () =>
-                                    _showChangePasswordDialog(context, user),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.security,
-                                  color: AppColors.primary,
+                              if (_canManagePermissions)
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.security,
+                                    color: AppColors.primary,
+                                  ),
+                                  tooltip: l10n.managePermissions,
+                                  onPressed: () => _showPermissionsDialog(
+                                    context,
+                                    user,
+                                    userPermissions,
+                                  ),
                                 ),
-                                tooltip: l10n.managePermissions,
-                                onPressed: () => _showPermissionsDialog(
-                                  context,
-                                  user,
-                                  userPermissions,
-                                ),
-                              ),
-                              if (!user.isAdmin)
+                              if (!user.isAdmin && _canEditUser)
                                 IconButton(
                                   icon: const Icon(
                                     Icons.admin_panel_settings,
@@ -1888,9 +1987,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
 
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.userCreatedSuccessfully)),
-                  );
+                  // Success message will be shown by BlocListener
                 },
               ),
             ],

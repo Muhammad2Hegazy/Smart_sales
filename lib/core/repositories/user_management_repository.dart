@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 import '../data_sources/local/user_management_local_data_source.dart';
@@ -97,18 +98,23 @@ class UserManagementRepository {
     required String role,
     String? name,
   }) async {
+    debugPrint('Creating user: $username with role: $role');
+    
     // Check if username already exists
     final existingProfile = await _dbHelper.getUserProfileByUsername(username);
     if (existingProfile != null) {
+      debugPrint('Username already exists: $username');
       throw Exception('Username already exists');
     }
 
     // Generate user ID
     final userId = DateTime.now().millisecondsSinceEpoch.toString();
+    debugPrint('Generated user ID: $userId');
 
     // Hash password
     final passwordBytes = utf8.encode(password);
     final passwordHash = sha256.convert(passwordBytes).toString();
+    debugPrint('Password hashed successfully');
 
     // Create user profile
     final profile = UserProfile(
@@ -121,6 +127,15 @@ class UserManagementRepository {
 
     // Save user profile and password to local database
     await _dbHelper.insertUserProfile(profile, passwordHash);
+    debugPrint('User profile and password saved to database');
+
+    // Verify the user was created
+    final verifyProfile = await _dbHelper.getUserProfileByUsername(username);
+    if (verifyProfile != null) {
+      debugPrint('User verified in database: ${verifyProfile.userId}');
+    } else {
+      debugPrint('ERROR: User not found after creation!');
+    }
 
     return userId;
   }

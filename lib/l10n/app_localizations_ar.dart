@@ -225,6 +225,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cashier => 'الكاشير';
 
   @override
+  String get admin => 'مدير';
+
+  @override
+  String get manager => 'مشرف';
+
+  @override
   String get paymentMethod => 'اختر طريقة الدفع:';
 
   @override

@@ -7,6 +7,10 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/models/user_permission.dart';
+import '../../core/services/permission_service.dart';
+import '../../core/repositories/user_management_repository.dart';
+import '../../core/data_sources/local/user_management_local_data_source.dart';
 import '../blocs/financial/financial_bloc.dart';
 import '../blocs/financial/financial_event.dart';
 import '../blocs/financial/financial_state.dart';
@@ -24,13 +28,43 @@ class _FinancialScreenState extends State<FinancialScreen> {
   DateTime? _selectedStartDate;
   DateTime? _selectedEndDate;
 
+  // Permission state
+  late PermissionService _permissionService;
+  bool _canCalculateProfitLoss = true;
+
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _selectedStartDate = DateTime(now.year, now.month, now.day);
     _selectedEndDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    _initializePermissions();
     _loadTransactions();
+  }
+
+  /// Initialize permission service and load permissions
+  Future<void> _initializePermissions() async {
+    final dbHelper = DatabaseHelper();
+    final userManagementLocalDataSource = UserManagementLocalDataSource();
+    final userManagementRepository = UserManagementRepository(
+      userManagementLocalDataSource,
+      dbHelper,
+    );
+    _permissionService = PermissionService(dbHelper, userManagementRepository);
+
+    try {
+      final hasPermission = await _permissionService.hasPermission(
+        PermissionKeys.financialCalculateProfitLoss,
+      );
+
+      if (mounted) {
+        setState(() {
+          _canCalculateProfitLoss = hasPermission;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading financial permissions: $e');
+    }
   }
 
   void _loadTransactions() {
@@ -43,9 +77,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
       );
     } else {
       // Load all transactions if no date range is selected
-      context.read<FinancialBloc>().add(
-        const LoadFinancialTransactions(),
-      );
+      context.read<FinancialBloc>().add(const LoadFinancialTransactions());
     }
   }
 
@@ -69,30 +101,39 @@ class _FinancialScreenState extends State<FinancialScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       // Get sales total (excludes hospitality sales)
-      final salesTotal = await dbHelper.getTotalSalesByDateRange(startDate, endDate);
-      
+      final salesTotal = await dbHelper.getTotalSalesByDateRange(
+        startDate,
+        endDate,
+      );
+
       // Get hospitality sales total (to be treated as losses)
-      final hospitalitySales = await dbHelper.getTotalHospitalitySalesByDateRange(startDate, endDate);
-      
+      final hospitalitySales = await dbHelper
+          .getTotalHospitalitySalesByDateRange(startDate, endDate);
+
       // Get cash in and cash out
-      final cashIn = await dbHelper.getTotalCashInByDateRange(startDate, endDate);
-      final cashOut = await dbHelper.getTotalCashOutByDateRange(startDate, endDate);
+      final cashIn = await dbHelper.getTotalCashInByDateRange(
+        startDate,
+        endDate,
+      );
+      final cashOut = await dbHelper.getTotalCashOutByDateRange(
+        startDate,
+        endDate,
+      );
 
       // Calculate profit/loss
       // Hospitality sales are added to expenses (losses), not income
       final totalIncome = salesTotal + cashIn;
-      final totalExpenses = cashOut + hospitalitySales; // Add hospitality sales to expenses
+      final totalExpenses =
+          cashOut + hospitalitySales; // Add hospitality sales to expenses
       final netResult = totalIncome - totalExpenses;
 
       if (!mounted) return;
-      
+
       // Close loading indicator
       Navigator.pop(context);
 
@@ -126,9 +167,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(l10n.profitLoss),
-      ),
+      appBar: AppBar(title: Text(l10n.profitLoss)),
       body: Column(
         children: [
           _buildDateRangeSelector(l10n),
@@ -152,10 +191,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
 
                 return Row(
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: _buildSummaryCards(state, l10n),
-                    ),
+                    Expanded(flex: 2, child: _buildSummaryCards(state, l10n)),
                     Expanded(
                       flex: 3,
                       child: _buildTransactionsList(state, l10n),
@@ -175,9 +211,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.border),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
@@ -195,7 +229,11 @@ class _FinancialScreenState extends State<FinancialScreen> {
                       );
                       if (date != null) {
                         setState(() {
-                          _selectedStartDate = DateTime(date.year, date.month, date.day);
+                          _selectedStartDate = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                          );
                           _loadTransactions();
                         });
                       }
@@ -229,7 +267,14 @@ class _FinancialScreenState extends State<FinancialScreen> {
                       );
                       if (date != null) {
                         setState(() {
-                          _selectedEndDate = DateTime(date.year, date.month, date.day, 23, 59, 59);
+                          _selectedEndDate = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            23,
+                            59,
+                            59,
+                          );
                           _loadTransactions();
                         });
                       }
@@ -255,10 +300,24 @@ class _FinancialScreenState extends State<FinancialScreen> {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          AppButton(
-            label: l10n.profitLoss,
-            onPressed: _calculateProfitLoss,
-            icon: Icons.calculate,
+          Opacity(
+            opacity: _canCalculateProfitLoss ? 1.0 : 0.5,
+            child: AppButton(
+              label: l10n.profitLoss,
+              onPressed: _canCalculateProfitLoss
+                  ? _calculateProfitLoss
+                  : () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'ليس لديك صلاحية حساب الأرباح والخسائر',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    },
+              icon: Icons.calculate,
+            ),
           ),
         ],
       ),
@@ -269,7 +328,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
     final cashIn = state.transactions
         .where((t) => t.type == TransactionType.cashIn)
         .fold<double>(0.0, (sum, t) => sum + t.amount);
-    
+
     final cashOut = state.transactions
         .where((t) => t.type == TransactionType.cashOut)
         .fold<double>(0.0, (sum, t) => sum + t.amount);
@@ -318,7 +377,12 @@ class _FinancialScreenState extends State<FinancialScreen> {
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, IconData icon, Color color) {
+  Widget _buildSummaryItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Row(
       children: [
         Container(
@@ -385,7 +449,7 @@ class _FinancialScreenState extends State<FinancialScreen> {
               itemBuilder: (context, index) {
                 final transaction = state.transactions[index];
                 final isCashIn = transaction.type == TransactionType.cashIn;
-                
+
                 return AppCard(
                   margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -394,13 +458,16 @@ class _FinancialScreenState extends State<FinancialScreen> {
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.sm),
                         decoration: BoxDecoration(
-                          color: (isCashIn ? AppColors.secondary : AppColors.error)
-                              .withValues(alpha: 0.1),
+                          color:
+                              (isCashIn ? AppColors.secondary : AppColors.error)
+                                  .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(AppSpacing.sm),
                         ),
                         child: Icon(
                           isCashIn ? Icons.arrow_downward : Icons.arrow_upward,
-                          color: isCashIn ? AppColors.secondary : AppColors.error,
+                          color: isCashIn
+                              ? AppColors.secondary
+                              : AppColors.error,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
@@ -437,7 +504,9 @@ class _FinancialScreenState extends State<FinancialScreen> {
                       Text(
                         '${isCashIn ? '+' : '-'}${CurrencyFormatter.format(transaction.amount)}',
                         style: AppTextStyles.titleMedium.copyWith(
-                          color: isCashIn ? AppColors.secondary : AppColors.error,
+                          color: isCashIn
+                              ? AppColors.secondary
+                              : AppColors.error,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -493,14 +562,30 @@ class _ProfitLossDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildRow(l10n.totalSales, CurrencyFormatter.format(salesTotal), AppColors.primary),
+          _buildRow(
+            l10n.totalSales,
+            CurrencyFormatter.format(salesTotal),
+            AppColors.primary,
+          ),
           const SizedBox(height: AppSpacing.sm),
           if (hospitalitySales > 0)
-            _buildRow('Hospitality Sales (Loss)', CurrencyFormatter.format(hospitalitySales), AppColors.error),
+            _buildRow(
+              'Hospitality Sales (Loss)',
+              CurrencyFormatter.format(hospitalitySales),
+              AppColors.error,
+            ),
           if (hospitalitySales > 0) const SizedBox(height: AppSpacing.sm),
-          _buildRow(l10n.totalCashIn, CurrencyFormatter.format(cashIn), AppColors.secondary),
+          _buildRow(
+            l10n.totalCashIn,
+            CurrencyFormatter.format(cashIn),
+            AppColors.secondary,
+          ),
           const SizedBox(height: AppSpacing.sm),
-          _buildRow(l10n.totalCashOut, CurrencyFormatter.format(cashOut), AppColors.error),
+          _buildRow(
+            l10n.totalCashOut,
+            CurrencyFormatter.format(cashOut),
+            AppColors.error,
+          ),
           const Divider(),
           _buildRow(
             isProfit ? l10n.netProfit : l10n.netLoss,
@@ -526,7 +611,12 @@ class _ProfitLossDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(String label, String value, Color color, {bool isBold = false}) {
+  Widget _buildRow(
+    String label,
+    String value,
+    Color color, {
+    bool isBold = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -547,4 +637,3 @@ class _ProfitLossDialog extends StatelessWidget {
     );
   }
 }
-
