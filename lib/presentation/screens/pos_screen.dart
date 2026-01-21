@@ -138,8 +138,13 @@ class _POSContentState extends State<_POSContent> {
     // Get items from active table only
     final activeTableItems = _tableCarts[_activeTableNumber] ?? [];
     
-    // Update the cart bloc with active table's items in a single batch
-    context.read<CartBloc>().add(SetCartItems(List<CartItem>.from(activeTableItems)));
+    // Update the cart bloc with active table's items
+    context.read<CartBloc>().add(const ClearCart());
+    for (final item in activeTableItems) {
+      for (int i = 0; i < item.quantity; i++) {
+        context.read<CartBloc>().add(AddItemToCart(item.copyWith(quantity: 1)));
+      }
+    }
   }
   
   /// Get discount percentage for the active table

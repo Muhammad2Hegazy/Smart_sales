@@ -1,3 +1,0 @@
-## 2025-05-23 - [Batching BLoC State Updates & Search Debouncing]
-**Learning:** In a BLoC-based Flutter app, adding items to a list one-by-one in a loop (especially if the parent widget is wrapped in a BlocBuilder) leads to O(N^2) rebuild complexity and multiple redundant state emissions. Similarly, updating search queries on every keystroke in a large UI tree causes significant lag.
-**Action:** Always provide batch update events (e.g., `SetCartItems`) for list-based states and implement debouncing in search inputs to ensure the UI remains responsive under heavy loads or fast user interaction.
