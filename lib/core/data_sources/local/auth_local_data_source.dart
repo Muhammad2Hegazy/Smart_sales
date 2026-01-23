@@ -16,9 +16,6 @@ class AuthLocalDataSource {
   static const String _keyCurrentUserRole = 'auth_user_role';
   static const String _keyIsLoggedIn = 'auth_is_logged_in';
 
-  // Developer MAC address - always allowed
-  static const String _developerMacAddress = 'E0:0A:F6:C3:BA:FF';
-
   final DatabaseHelper _dbHelper;
 
   AuthLocalDataSource(this._dbHelper);
@@ -99,8 +96,7 @@ class AuthLocalDataSource {
     debugPrint('Password verified');
 
     // Check MAC address - allow login only if device MAC address is registered
-    // Developer MAC address is always allowed
-    // STRICT: No fallbacks - MAC must be detected and must be developer MAC or registered device
+    // STRICT: No fallbacks - MAC must be detected and must be registered device (or first admin device)
     debugPrint('Getting MAC address...');
     final currentMacAddress = await MacAddressHelper.getMacAddress().timeout(
       const Duration(seconds: 5),
@@ -122,33 +118,26 @@ class AuthLocalDataSource {
         .replaceAll(RegExp(r'[\s\-]'), ':')
         .replaceAll(RegExp(r':+'), ':');
 
-    final normalizedDeveloperMac = _developerMacAddress.toUpperCase()
-        .replaceAll(RegExp(r'[\s\-]'), ':')
-        .replaceAll(RegExp(r':+'), ':');
-
     debugPrint('Normalized detected MAC: $normalizedDetectedMac');
-    debugPrint('Normalized developer MAC: $normalizedDeveloperMac');
 
-    // Check if it's the developer's MAC address
-    bool isDeveloperMac = false;
-    if (normalizedDetectedMac == normalizedDeveloperMac) {
-      isDeveloperMac = true;
-      debugPrint('Developer MAC detected, registering device...');
-      await _ensureDeveloperDeviceRegistered(profile.userId);
+    // Check if MAC address is registered in devices
+    // Try both original format and normalized format
+    Device? device = await _dbHelper.getDeviceByMacAddress(currentMacAddress);
+    if (device == null && normalizedDetectedMac != currentMacAddress.toUpperCase()) {
+      device = await _dbHelper.getDeviceByMacAddress(normalizedDetectedMac);
     }
 
-    if (!isDeveloperMac) {
-      // Not developer MAC - check if MAC address is registered in devices
-      // Try both original format and normalized format
-      Device? device = await _dbHelper.getDeviceByMacAddress(currentMacAddress);
-      if (device == null && normalizedDetectedMac != currentMacAddress.toUpperCase()) {
-        device = await _dbHelper.getDeviceByMacAddress(normalizedDetectedMac);
-      }
-
-      if (device == null) {
+    if (device == null) {
+      // SECURITY: If no devices are registered in the system, allow the first login for ADMIN only.
+      // This allows the first administrator to set up the system without a hardcoded backdoor.
+      final allDevices = await _dbHelper.getAllDevices();
+      if (allDevices.isEmpty && profile.role == 'admin') {
+        debugPrint('No devices registered and user is admin. Allowing first login for system setup.');
+      } else {
         debugPrint('Device not found in database. MAC: $currentMacAddress');
         throw Exception('Device not authorized. Please contact administrator to register this device.');
       }
+    } else {
       debugPrint('Device found in database: ${device.deviceName}');
     }
 
@@ -175,48 +164,6 @@ class AuthLocalDataSource {
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
     );
-  }
-
-  /// Ensure developer device is always registered
-  Future<void> _ensureDeveloperDeviceRegistered(String userId) async {
-    try {
-      // Check if developer device already exists
-      final existingDevice = await _dbHelper.getDeviceByMacAddress(_developerMacAddress);
-      if (existingDevice != null) {
-        return; // Already registered
-      }
-
-      // Get or create master
-      final master = await _dbHelper.getMaster();
-      String masterDeviceId;
-
-      if (master == null) {
-        // Create master if it doesn't exist
-        masterDeviceId = DateTime.now().millisecondsSinceEpoch.toString();
-        final newMaster = Master(
-          masterDeviceId: masterDeviceId,
-          masterName: 'Master Device',
-          userId: userId,
-          createdAt: DateTime.now(),
-        );
-        await _dbHelper.insertMaster(newMaster);
-      } else {
-        masterDeviceId = master.masterDeviceId;
-      }
-
-      // Register developer device
-      final device = Device(
-        deviceId: DateTime.now().millisecondsSinceEpoch.toString(),
-        deviceName: 'DEV',
-        masterDeviceId: masterDeviceId,
-        isMaster: false,
-        lastSeenAt: DateTime.now(),
-        macAddress: _developerMacAddress,
-      );
-      await _dbHelper.insertDevice(device);
-    } catch (e) {
-      debugPrint('Error ensuring developer device registered: $e');
-    }
   }
 
   Future<void> signOut() async {
