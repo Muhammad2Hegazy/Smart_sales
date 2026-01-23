@@ -4,8 +4,6 @@ import '../models/master.dart';
 import '../models/device.dart';
 import 'package:uuid/uuid.dart';
 
-// Developer MAC address constant
-const String _developerMacAddress = 'E0:0A:F6:C3:BA:FF';
 
 class DeviceRepository {
   final MasterLocalDataSource _masterLocalDataSource;
@@ -77,13 +75,7 @@ class DeviceRepository {
     // No existing device found - create new one
     final deviceId = _uuid.v4();
     
-    // Check if this is the developer MAC address - use "DEV" as device name
-    String finalDeviceName;
-    if (macAddress != null && macAddress.toUpperCase() == _developerMacAddress.toUpperCase()) {
-      finalDeviceName = 'DEV';
-    } else {
-      finalDeviceName = deviceName ?? 'Device ${deviceId.substring(0, 8)}';
-    }
+    final String finalDeviceName = deviceName ?? 'Device ${deviceId.substring(0, 8)}';
     
     final device = Device(
       deviceId: deviceId,

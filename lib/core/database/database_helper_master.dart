@@ -155,8 +155,6 @@ extension DatabaseHelperMaster on DatabaseHelper {
     }
   }
 
-  /// Ensure developer device is always registered
-  /// Developer MAC: E0:0A:F6:C3:BA:FF
   // Sync status helpers
   Future<List<Map<String, dynamic>>> getPendingSyncRecords(String tableName, String masterDeviceId) async {
     final db = await database;
