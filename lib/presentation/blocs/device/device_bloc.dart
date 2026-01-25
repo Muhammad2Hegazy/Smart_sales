@@ -41,11 +41,7 @@ class DeviceBloc extends Bloc<DeviceEvent, DeviceState> {
         await _getCurrentDeviceId(); // Initialize device ID
         // Get physical MAC address
         final macAddress = await MacAddressHelper.getMacAddress();
-        // Check if this is developer MAC - use "DEV" instead of "Master Device"
-        const developerMacAddress = 'E0:0A:F6:C3:BA:FF';
-        final deviceName = (macAddress != null && macAddress.toUpperCase() == developerMacAddress.toUpperCase())
-            ? 'DEV'
-            : 'Master Device';
+        const String deviceName = 'Master Device';
         final currentDevice = await _deviceRepository.registerCurrentDevice(
           masterDeviceId: master.masterDeviceId,
           deviceName: deviceName,

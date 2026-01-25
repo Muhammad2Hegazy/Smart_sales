@@ -16,9 +16,6 @@ class AuthLocalDataSource {
   static const String _keyCurrentUserRole = 'auth_user_role';
   static const String _keyIsLoggedIn = 'auth_is_logged_in';
 
-  // Developer MAC address - always allowed
-  static const String _developerMacAddress = 'E0:0A:F6:C3:BA:FF';
-
   final DatabaseHelper _dbHelper;
 
   AuthLocalDataSource(this._dbHelper);
@@ -122,23 +119,19 @@ class AuthLocalDataSource {
         .replaceAll(RegExp(r'[\s\-]'), ':')
         .replaceAll(RegExp(r':+'), ':');
 
-    final normalizedDeveloperMac = _developerMacAddress.toUpperCase()
-        .replaceAll(RegExp(r'[\s\-]'), ':')
-        .replaceAll(RegExp(r':+'), ':');
-
     debugPrint('Normalized detected MAC: $normalizedDetectedMac');
-    debugPrint('Normalized developer MAC: $normalizedDeveloperMac');
 
-    // Check if it's the developer's MAC address
-    bool isDeveloperMac = false;
-    if (normalizedDetectedMac == normalizedDeveloperMac) {
-      isDeveloperMac = true;
-      debugPrint('Developer MAC detected, registering device...');
-      await _ensureDeveloperDeviceRegistered(profile.userId);
-    }
+    // Secure 'First-Device Registration' policy:
+    // If no devices are registered in the database, allow the first Admin login
+    // to register the master device automatically.
+    final allDevices = await _dbHelper.getAllDevices();
+    bool isFirstRegistration = allDevices.isEmpty && profile.role == 'admin';
 
-    if (!isDeveloperMac) {
-      // Not developer MAC - check if MAC address is registered in devices
+    if (isFirstRegistration) {
+      debugPrint('No devices registered and admin login detected. Registering this device as Master...');
+      await _registerAsMasterDevice(profile.userId, normalizedDetectedMac);
+    } else {
+      // Not first registration - check if MAC address is registered in devices
       // Try both original format and normalized format
       Device? device = await _dbHelper.getDeviceByMacAddress(currentMacAddress);
       if (device == null && normalizedDetectedMac != currentMacAddress.toUpperCase()) {
@@ -177,45 +170,34 @@ class AuthLocalDataSource {
     );
   }
 
-  /// Ensure developer device is always registered
-  Future<void> _ensureDeveloperDeviceRegistered(String userId) async {
+  /// Register the current device as the Master device (used for first-time setup)
+  Future<void> _registerAsMasterDevice(String userId, String macAddress) async {
     try {
-      // Check if developer device already exists
-      final existingDevice = await _dbHelper.getDeviceByMacAddress(_developerMacAddress);
-      if (existingDevice != null) {
-        return; // Already registered
-      }
+      final masterDeviceId = DateTime.now().millisecondsSinceEpoch.toString();
 
-      // Get or create master
-      final master = await _dbHelper.getMaster();
-      String masterDeviceId;
+      // 1. Create Master record
+      final newMaster = Master(
+        masterDeviceId: masterDeviceId,
+        masterName: 'Master Device',
+        userId: userId,
+        createdAt: DateTime.now(),
+      );
+      await _dbHelper.insertMaster(newMaster);
 
-      if (master == null) {
-        // Create master if it doesn't exist
-        masterDeviceId = DateTime.now().millisecondsSinceEpoch.toString();
-        final newMaster = Master(
-          masterDeviceId: masterDeviceId,
-          masterName: 'Master Device',
-          userId: userId,
-          createdAt: DateTime.now(),
-        );
-        await _dbHelper.insertMaster(newMaster);
-      } else {
-        masterDeviceId = master.masterDeviceId;
-      }
-
-      // Register developer device
+      // 2. Register this device as the Master device
       final device = Device(
         deviceId: DateTime.now().millisecondsSinceEpoch.toString(),
-        deviceName: 'DEV',
+        deviceName: 'Master Device',
         masterDeviceId: masterDeviceId,
-        isMaster: false,
+        isMaster: true,
         lastSeenAt: DateTime.now(),
-        macAddress: _developerMacAddress,
+        macAddress: macAddress,
       );
       await _dbHelper.insertDevice(device);
+      debugPrint('Master device registered successfully for MAC: $macAddress');
     } catch (e) {
-      debugPrint('Error ensuring developer device registered: $e');
+      debugPrint('Error registering master device: $e');
+      throw Exception('Failed to register master device: $e');
     }
   }
 

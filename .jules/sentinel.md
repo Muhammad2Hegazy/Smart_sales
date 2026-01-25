@@ -1,0 +1,4 @@
+## 2025-01-25 - [CRITICAL] Removed Hardcoded Developer MAC Address Bypass
+**Vulnerability:** A hardcoded MAC address (`E0:0A:F6:C3:BA:FF`) was used in `AuthLocalDataSource`, `DeviceRepository`, and `DeviceBloc` as a bypass for device registration and authentication. This allowed any device with this MAC address to bypass security controls and register as a developer device ("DEV").
+**Learning:** Hardcoded bypasses (backdoors) are often added during development for convenience (bootstrapping the first admin) but represent a significant security risk if left in production.
+**Prevention:** Use a "First-Device Registration" policy where the first login by an administrator on a fresh installation automatically registers that device as the Master device, eliminating the need for hardcoded bypasses.
