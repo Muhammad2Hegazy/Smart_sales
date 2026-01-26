@@ -1,0 +1,4 @@
+## 2026-01-26 - [Insecure Forgot Password Feature]
+**Vulnerability:** The login screen contained a "Forgot Password" feature that allowed any person to select any user from a dropdown and reset their password without any authentication or verification.
+**Learning:** A critical security vulnerability was supposedly removed according to the project's memories but was still present in the codebase. This highlights the importance of manual verification even when documentation/memories claim a fix has been implemented.
+**Prevention:** Sensitive operations like password resets must ALWAYS be authenticated (e.g., restricted to administrators) or use secure out-of-band verification (e.g., email tokens). In this local-first POS, restricting password resets to the Admin settings screen is the preferred approach.
