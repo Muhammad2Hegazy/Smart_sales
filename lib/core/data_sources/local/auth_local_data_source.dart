@@ -129,28 +129,18 @@ class AuthLocalDataSource {
     debugPrint('Normalized detected MAC: $normalizedDetectedMac');
     debugPrint('Normalized developer MAC: $normalizedDeveloperMac');
 
-    // Check if it's the developer's MAC address
-    bool isDeveloperMac = false;
-    if (normalizedDetectedMac == normalizedDeveloperMac) {
-      isDeveloperMac = true;
-      debugPrint('Developer MAC detected, registering device...');
-      await _ensureDeveloperDeviceRegistered(profile.userId);
+    // Check if MAC address is registered in devices
+    // Try both original format and normalized format
+    Device? device = await _dbHelper.getDeviceByMacAddress(currentMacAddress);
+    if (device == null && normalizedDetectedMac != currentMacAddress.toUpperCase()) {
+      device = await _dbHelper.getDeviceByMacAddress(normalizedDetectedMac);
     }
 
-    if (!isDeveloperMac) {
-      // Not developer MAC - check if MAC address is registered in devices
-      // Try both original format and normalized format
-      Device? device = await _dbHelper.getDeviceByMacAddress(currentMacAddress);
-      if (device == null && normalizedDetectedMac != currentMacAddress.toUpperCase()) {
-        device = await _dbHelper.getDeviceByMacAddress(normalizedDetectedMac);
-      }
-
-      if (device == null) {
-        debugPrint('Device not found in database. MAC: $currentMacAddress');
-        throw Exception('Device not authorized. Please contact administrator to register this device.');
-      }
-      debugPrint('Device found in database: ${device.deviceName}');
+    if (device == null) {
+      debugPrint('Device not found in database. MAC: $currentMacAddress');
+      throw Exception('Device not authorized. Please contact administrator to register this device.');
     }
+    debugPrint('Device found in database: ${device.deviceName}');
 
     debugPrint('Saving user session...');
     final prefs = await SharedPreferences.getInstance().timeout(

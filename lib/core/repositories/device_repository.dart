@@ -77,13 +77,7 @@ class DeviceRepository {
     // No existing device found - create new one
     final deviceId = _uuid.v4();
     
-    // Check if this is the developer MAC address - use "DEV" as device name
-    String finalDeviceName;
-    if (macAddress != null && macAddress.toUpperCase() == _developerMacAddress.toUpperCase()) {
-      finalDeviceName = 'DEV';
-    } else {
-      finalDeviceName = deviceName ?? 'Device ${deviceId.substring(0, 8)}';
-    }
+    final finalDeviceName = deviceName ?? 'Device ${deviceId.substring(0, 8)}';
     
     final device = Device(
       deviceId: deviceId,
